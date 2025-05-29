@@ -1,0 +1,17 @@
+{
+  "activities": [
+    {
+      "id": 1,
+      "title": "校园歌手大赛",
+      "category": "后端测试",
+      "tags": ["音乐", "比赛", "才艺"],
+      "date": "2025-05-25",
+      "time": "19:00-21:30",
+      "location": "大学生活动中心",
+      "registered": 78,
+      "capacity": 100,
+      "likes": 45,
+      "image": "..."
+    }
+  ]
+}
