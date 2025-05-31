@@ -9,6 +9,8 @@ import Stats from './pages/Stats'
 import ClubActivities from './pages/ClubActivities'
 import ClubStats from './pages/ClubStats'
 import ClubApply from './pages/ClubApply'
+import RegisterPage from "./pages/RegisterPage";
+import LoginPage from "./pages/LoginPage";
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
         <Route path="/ClubActivities" element={<ClubActivities />} />
         <Route path="/ClubStats" element={<ClubStats />} />
         <Route path="/ClubApply" element={<ClubApply />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login" element={<LoginPage />} />
       </Routes>
     </BrowserRouter>
   );

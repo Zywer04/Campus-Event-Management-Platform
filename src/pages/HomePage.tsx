@@ -57,7 +57,13 @@ const HomePage: React.FC = () => {
 
   };
 
+  const handleRegisterClick = () => {
+  navigate("/register"); // 跳转到报名页面
+};
 
+  const handleLogin = () => {
+    navigate("/login"); // 跳转到登录页
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -100,6 +106,13 @@ const HomePage: React.FC = () => {
                 </div>
               )}
             </div>
+             {/* 登录按钮 */}
+          <button
+            onClick={() => navigate("/login")}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            登录
+          </button>
           </div>
         </div>
       </nav>
@@ -204,7 +217,9 @@ const HomePage: React.FC = () => {
                       <p className="text-xl text-white/90 mb-8">
                         5 公里校园跑即将开始
                       </p>
-                      <button className="px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap !rounded-button">
+                      <button
+                      onClick={handleRegisterClick}
+                      className="px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap !rounded-button">
                         立即报名
                       </button>
                     </div>
@@ -271,7 +286,9 @@ const HomePage: React.FC = () => {
                     <span className="text-sm font-medium text-purple-600">
                       报名进行中
                     </span>
-                    <button className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap !rounded-button">
+                    <button
+                    onClick={handleRegisterClick}
+                    className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap !rounded-button">
                       立即报名
                     </button>
                   </div>
