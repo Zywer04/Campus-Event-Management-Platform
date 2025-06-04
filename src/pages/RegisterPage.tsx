@@ -4,6 +4,7 @@ import * as echarts from 'echarts';
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
+    activity_id: 1,
     name: '',
     studentId: '',
     phone: '',
@@ -12,9 +13,30 @@ const RegisterPage: React.FC = () => {
     grade: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const response = await fetch('http://localhost:8000/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const result = await response.json();
+    if (response.ok) {
+      alert("报名成功！");
+    } else {
+      alert("报名失败：" + result.message);
+    }
+  } catch (error) {
+    console.error("提交出错", error);
+    alert("提交出错");
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -169,6 +191,7 @@ const RegisterPage: React.FC = () => {
             <div className="max-w-[1000px] mx-auto px-6 py-4">
               <button
                 type="submit"
+                onClick={handleSubmit}
                 className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap !rounded-button"
               >
                 提交报名
