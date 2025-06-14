@@ -11,12 +11,14 @@ import ClubStats from './pages/ClubStats'
 import ClubApply from './pages/ClubApply'
 import RegisterPage from "./pages/RegisterPage";
 import LoginPage from "./pages/LoginPage";
+import ActivityDetail from './pages/ActivityDetail';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/activities/:id" element={<ActivityDetail />} />
         <Route path="/registered" element={<RegisteredActivities />} />
         <Route path="/activities/history" element={<HistoryPage />} />
         <Route path="/publish" element={<Publish />} />
