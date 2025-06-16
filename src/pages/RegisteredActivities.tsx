@@ -1,16 +1,10 @@
-// The exported code uses Tailwind CSS. Install Tailwind CSS in your dev environment to ensure all styles work.
-
 import React, { useState } from 'react';
-import * as echarts from 'echarts';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const RegisteredActivities: React.FC = () => {
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-
-  const activities = [
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [activities, setActivities] = useState([
     {
       id: '1',
       title: '校园马拉松比赛',
@@ -43,7 +37,13 @@ const RegisteredActivities: React.FC = () => {
       location: '图书馆报告厅',
       image: 'https://readdy.ai/api/search-image?query=Academic%2520lecture%2520in%2520modern%2520university%2520auditorium%2520with%2520professional%2520presentation%2520setup%2520and%2520engaged%2520student%2520audience%2520learning%2520atmosphere&width=400&height=250&seq=4&orientation=landscape'
     }
-  ];
+  ]);
+
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   const statusColors = {
     success: 'bg-green-100 text-green-800',
@@ -63,16 +63,60 @@ const RegisteredActivities: React.FC = () => {
   };
 
   const confirmCancel = () => {
+    if (selectedActivityId) {
+      setActivities(prev =>
+        prev.filter(activity => activity.id !== selectedActivityId)
+      );
+    }
     setShowCancelModal(false);
     setSelectedActivityId(null);
   };
+
+  const filteredActivities = activities.filter(activity =>
+    statusFilter === 'all' ? true : activity.status === statusFilter
+  );
+
+  // 处理导航
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
+  // 判断当前路径是否匹配
+  const isActive = (path: string) => {
+    const currentPath = location.pathname;
+    if (path === '/') {
+      return currentPath === '/' || currentPath === '/registered' || currentPath === '/activities/history';
+    }
+    return currentPath === path;
+  };
+
+  const myActivities = [
+    { id: 'registered', name: '已报名活动', icon: 'fa-calendar-check', path: '/registered' },
+    { id: 'history', name: '历史参与', icon: 'fa-history', path: '/activities/history' },
+  ];
+
+  const adminMenus = [
+    { id: 'publish', name: '发布活动', icon: 'fa-plus-circle', path: '/publish' },
+    { id: 'manage', name: '活动管理', icon: 'fa-tasks', path: '/ActivityManage' },
+    { id: 'stats', name: '数据统计', icon: 'fa-chart-bar', path: '/Stats' },
+    { id: 'audit', name: '审核活动', icon: 'fa-clipboard-check', path: '/AuditPage' },
+  ];
+
+  const clubMenus = [
+    { id: 'clubActivities', name: '管理社团活动', icon: 'fa-users-cog', path: '/ClubActivities' },
+    { id: 'clubStats', name: '社团活动数据', icon: 'fa-chart-line', path: '/ClubStats' },
+    { id: 'clubApply', name: '申报活动', icon: 'fa-file-signature', path: '/ClubApply' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 顶部导航 */}
       <nav className="fixed top-0 left-0 right-0 h-16 bg-white shadow-sm z-50">
         <div className="max-w-[1440px] mx-auto px-6 h-full flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+          <div 
+            className="flex items-center space-x-2 cursor-pointer"
+            onClick={() => handleNavigation('/')}
+          >
             <i className="fas fa-university text-purple-600 text-2xl"></i>
             <span className="text-lg font-semibold">校园活动管理平台</span>
           </div>
@@ -81,6 +125,7 @@ const RegisteredActivities: React.FC = () => {
               <button
                 onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
                 className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 cursor-pointer whitespace-nowrap !rounded-button"
+                aria-label="切换语言"
               >
                 <i className="fas fa-globe"></i>
                 <span>简体中文</span>
@@ -88,12 +133,20 @@ const RegisteredActivities: React.FC = () => {
               </button>
               {showLanguageDropdown && (
                 <div className="absolute top-full right-0 mt-2 w-32 bg-white rounded-lg shadow-lg py-2">
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600">
+                  <button
+                    onClick={() => setShowLanguageDropdown(false)}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+                    aria-label="切换到英文"
+                  >
                     English
-                  </a>
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600">
+                  </button>
+                  <button
+                    onClick={() => setShowLanguageDropdown(false)}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+                    aria-label="切换到中文"
+                  >
                     简体中文
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
@@ -104,43 +157,87 @@ const RegisteredActivities: React.FC = () => {
       {/* 左侧导航 */}
       <div className="fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200">
         <div className="p-6 space-y-8">
+          {/* 我的活动 */}
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">我的活动</h3>
             <div className="space-y-2">
-              <a
-                href="https://readdy.ai/home/b0cf731b-de36-44f8-8c9f-e57d09ede402/446a40e3-0c00-4354-93ed-34b1ad9576e3"
-                data-readdy="true"
-                className="w-full flex items-center space-x-3 px-4 py-2 rounded-lg bg-purple-50 text-purple-600 text-left transition-colors cursor-pointer"
-              >
-                <i className="fas fa-calendar-check"></i>
-                <span>已报名活动</span>
-              </a>
-              <button className="w-full flex items-center space-x-3 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-left transition-colors cursor-pointer whitespace-nowrap !rounded-button">
-                <i className="fas fa-history"></i>
-                <span>历史参与</span>
-              </button>
+              {myActivities.map((menu) => (
+                <button
+                  key={menu.id}
+                  onClick={() => handleNavigation(menu.path)}
+                  className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg ${
+                    isActive(menu.path) ? 'bg-purple-50 text-purple-600' : 'text-gray-600 hover:bg-gray-50'
+                  } text-left transition-colors cursor-pointer`}
+                  aria-label={menu.name}
+                >
+                  <i className={`fas ${menu.icon}`}></i>
+                  <span>{menu.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 管理员功能 */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">管理员功能</h3>
+            <div className="space-y-2">
+              {adminMenus.map((menu) => (
+                <button
+                  key={menu.id}
+                  onClick={() => handleNavigation(menu.path)}
+                  className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg ${
+                    isActive(menu.path) ? 'bg-purple-50 text-purple-600' : 'text-gray-600 hover:bg-gray-50'
+                  } text-left transition-colors cursor-pointer`}
+                  aria-label={menu.name}
+                >
+                  <i className={`fas ${menu.icon}`}></i>
+                  <span>{menu.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 社团功能 */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">社团功能</h3>
+            <div className="space-y-2">
+              {clubMenus.map((menu) => (
+                <button
+                  key={menu.id}
+                  onClick={() => handleNavigation(menu.path)}
+                  className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg ${
+                    isActive(menu.path) ? 'bg-purple-50 text-purple-600' : 'text-gray-600 hover:bg-gray-50'
+                  } text-left transition-colors cursor-pointer`}
+                  aria-label={menu.name}
+                >
+                  <i className={`fas ${menu.icon}`}></i>
+                  <span>{menu.name}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 主内容区 */}
+      {/* 主内容 */}
       <main className="ml-64 pt-16 min-h-screen">
         <div className="max-w-[1176px] mx-auto px-6 py-8">
           {/* 顶部操作区 */}
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-semibold">已报名活动（{activities.length}）</h2>
+            <h2 className="text-xl font-semibold">已报名活动（{filteredActivities.length}）</h2>
             <div className="flex items-center space-x-4">
               <div className="flex bg-white rounded-lg border border-gray-200">
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-4 py-2 ${viewMode === 'list' ? 'text-purple-600' : 'text-gray-600'} cursor-pointer whitespace-nowrap !rounded-button`}
+                  className={`px-4 py-2 ${viewMode === 'list' ? 'text-purple-600' : 'text-gray-600'}`}
+                  aria-label="列表视图"
                 >
                   <i className="fas fa-list-ul"></i>
                 </button>
                 <button
                   onClick={() => setViewMode('calendar')}
-                  className={`px-4 py-2 ${viewMode === 'calendar' ? 'text-purple-600' : 'text-gray-600'} cursor-pointer whitespace-nowrap !rounded-button`}
+                  className={`px-4 py-2 ${viewMode === 'calendar' ? 'text-purple-600' : 'text-gray-600'}`}
+                  aria-label="日历视图"
                 >
                   <i className="fas fa-calendar-alt"></i>
                 </button>
@@ -148,7 +245,8 @@ const RegisteredActivities: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 bg-white rounded-lg border border-gray-200 text-gray-700 cursor-pointer focus:outline-none focus:border-purple-500"
+                className="px-4 py-2 bg-white rounded-lg border border-gray-200 text-gray-700"
+                aria-label="活动状态筛选"
               >
                 <option value="all">全部状态</option>
                 <option value="success">报名成功</option>
@@ -158,37 +256,28 @@ const RegisteredActivities: React.FC = () => {
             </div>
           </div>
 
-          {/* 活动列表 */}
-          <div className="grid grid-cols-2 gap-6">
-            {activities.map((activity) => (
+          {/* 活动卡片 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredActivities.map((activity) => (
               <div key={activity.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="aspect-w-16 aspect-h-10 overflow-hidden">
-                  <img
-                    src={activity.image}
-                    alt={activity.title}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="aspect-w-16 aspect-h-10">
+                  <img src={activity.image} alt={activity.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">{activity.title}</h3>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[activity.status as keyof typeof statusColors]}`}>
                       {statusText[activity.status as keyof typeof statusText]}
                     </span>
                   </div>
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center text-sm text-gray-500">
-                      <i className="fas fa-clock w-5"></i>
-                      <span>{activity.time}</span>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <i className="fas fa-map-marker-alt w-5"></i>
-                      <span>{activity.location}</span>
-                    </div>
+                  <div className="text-sm text-gray-500 mb-3">
+                    <p><i className="fas fa-clock mr-2"></i>{activity.time}</p>
+                    <p><i className="fas fa-map-marker-alt mr-2"></i>{activity.location}</p>
                   </div>
                   <button
                     onClick={() => handleCancelRegistration(activity.id)}
-                    className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer whitespace-nowrap !rounded-button"
+                    className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    aria-label={`取消报名${activity.title}`}
                   >
                     取消报名
                   </button>
@@ -199,7 +288,7 @@ const RegisteredActivities: React.FC = () => {
         </div>
       </main>
 
-      {/* 取消报名确认弹窗 */}
+      {/* 取消确认弹窗 */}
       {showCancelModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-[400px]">
@@ -208,13 +297,15 @@ const RegisteredActivities: React.FC = () => {
             <div className="flex justify-end space-x-4">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 cursor-pointer whitespace-nowrap !rounded-button"
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                aria-label="取消操作"
               >
                 取消
               </button>
               <button
                 onClick={confirmCancel}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer whitespace-nowrap !rounded-button"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                aria-label="确认取消报名"
               >
                 确认
               </button>
@@ -227,4 +318,3 @@ const RegisteredActivities: React.FC = () => {
 };
 
 export default RegisteredActivities;
-

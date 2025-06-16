@@ -51,7 +51,6 @@ const handleLogin = async (e: React.FormEvent) => {
 
     if (response.ok) {
       // 登录成功：保存 token 和 role
-      localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.user.role);
       localStorage.setItem('username', data.user.username);
 
@@ -261,11 +260,6 @@ const handleLogin = async (e: React.FormEvent) => {
                     记住密码
                   </label>
                 </div>
-                <div>
-                  <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-500">
-                    忘记密码？
-                  </a>
-                </div>
               </div>
             </div>
 
@@ -276,17 +270,8 @@ const handleLogin = async (e: React.FormEvent) => {
               登录
             </button>
 
-            {/* 注册链接 - 仅对学生和社团负责人显示 */}
-            {activeTab !== 'admin' && (
-              <div className="text-center mt-4">
-                <p className="text-sm text-gray-600">
-                  首次使用？
-                  <a href="#" className="font-medium text-blue-600 hover:text-blue-500 ml-1">
-                    注册账号
-                  </a>
-                </p>
-              </div>
-            )}
+
+
           </form>
 
           {/* 底部信息 */}
