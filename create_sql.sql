@@ -5,7 +5,7 @@ CREATE DATABASE IF NOT EXISTS campus_events
 
 USE campus_events;
 
--- 1. 账号表（原“登录表”）
+-- 1. 账号表
 CREATE TABLE users (
     username        VARCHAR(64)  NOT NULL COMMENT '登录账号 / 社团ID',
     password_hash   CHAR(60)     NOT NULL COMMENT 'bcrypt 等加密后的密码',
