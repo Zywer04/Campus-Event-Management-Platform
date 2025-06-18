@@ -13,11 +13,13 @@ Date: 2025-06-17
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 
-from fastapi import FastAPI, HTTPException, Depends, status, Security
+from fastapi import FastAPI, HTTPException, Depends, status, Security, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseSettings, BaseModel
+
+from pydantic import BaseModel, Field, constr
+from pydantic_settings import BaseSettings
 from sqlalchemy import (Column, String, DateTime, Enum, Integer, BigInteger, Text,
                         ForeignKey, Date, Time, create_engine, func)
 from sqlalchemy.ext.declarative import declarative_base
@@ -61,7 +63,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -391,7 +393,7 @@ def get_activity_statistic(token=Depends(verify_token), db: Session = Depends(ge
 @app.patch("/api/update-activity-status/{activity_id}")
 def update_activity_status(
     activity_id: int,
-    status_update: ActivityStatusUpdate,
+    status: str = Body(..., embed=True, example="approved"),
     token=Depends(verify_token),
     db: Session = Depends(get_db),
 ):
@@ -399,7 +401,8 @@ def update_activity_status(
     activity = db.query(Activity).filter(Activity.id == activity_id).first()
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    activity.status = status_update.status
+
+    activity.status = status
     db.commit()
     return {"status": "succeeded"}
 
