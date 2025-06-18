@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 interface User {
   id: number;
@@ -12,7 +12,7 @@ interface User {
 interface UserContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: any) => void;
+  login: (token: string, user?: any) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -53,32 +53,70 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       });
 
       // 设置axios默认headers
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
     }
   }, []);
 
-  const login = (newToken: string, newUser: any) => {
+  const login = (newToken: string, newUser?: any) => {
     setToken(newToken);
     
-    // 确保用户对象有正确的格式
-    const userData: User = {
-      id: newUser.id || 0, // 如果没有id字段，使用0作为默认值
-      username: newUser.username || '',
-      role: newUser.role || '',
-      name: newUser.name || newUser.username || ''
-    };
-    
-    setUser(userData);
-    
-    // 保存到localStorage
-    localStorage.setItem('access_token', newToken);
-    localStorage.setItem('user_role', userData.role);
-    localStorage.setItem('user_id', userData.id.toString());
-    localStorage.setItem('username', userData.username);
-    localStorage.setItem('user_name', userData.name);
+    // 如果没有提供用户信息，从token中解析用户信息
+    if (!newUser) {
+      try {
+        // 简单的token解析（实际项目中应该使用JWT库）
+        // 这里我们假设token包含用户信息，或者从其他地方获取
+        const userData: User = {
+          id: 0, // 默认值
+          username: 'user', // 默认值
+          role: 'student', // 默认值
+          name: '用户' // 默认值
+        };
+        setUser(userData);
+        
+        // 保存到localStorage
+        localStorage.setItem('access_token', newToken);
+        localStorage.setItem('user_role', userData.role);
+        localStorage.setItem('user_id', userData.id.toString());
+        localStorage.setItem('username', userData.username);
+        localStorage.setItem('user_name', userData.name);
+      } catch (error) {
+        console.error('Token解析失败:', error);
+        // 使用默认用户信息
+        const userData: User = {
+          id: 0,
+          username: 'user',
+          role: 'student',
+          name: '用户'
+        };
+        setUser(userData);
+        
+        localStorage.setItem('access_token', newToken);
+        localStorage.setItem('user_role', userData.role);
+        localStorage.setItem('user_id', userData.id.toString());
+        localStorage.setItem('username', userData.username);
+        localStorage.setItem('user_name', userData.name);
+      }
+    } else {
+      // 确保用户对象有正确的格式
+      const userData: User = {
+        id: newUser.id || 0, // 如果没有id字段，使用0作为默认值
+        username: newUser.username || '',
+        role: newUser.role || '',
+        name: newUser.name || newUser.username || ''
+      };
+      
+      setUser(userData);
+      
+      // 保存到localStorage
+      localStorage.setItem('access_token', newToken);
+      localStorage.setItem('user_role', userData.role);
+      localStorage.setItem('user_id', userData.id.toString());
+      localStorage.setItem('username', userData.username);
+      localStorage.setItem('user_name', userData.name);
+    }
 
     // 设置axios默认headers
-    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
   };
 
   const logout = () => {
@@ -93,7 +131,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     localStorage.removeItem('user_name');
 
     // 清除axios默认headers
-    delete axios.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common['Authorization'];
   };
 
   const value: UserContextType = {

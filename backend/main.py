@@ -14,35 +14,17 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 
 from fastapi import FastAPI, HTTPException, Depends, status, Security, Body
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, constr
 from pydantic_settings import BaseSettings
 from sqlalchemy import (Column, String, DateTime, Enum, Integer, BigInteger, Text,
                         ForeignKey, Date, Time, create_engine, func)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
-
-# ============================
-# FastAPI App
-# ============================
-app = FastAPI(
-    title="校园活动管理系统",
-    description="校园活动管理系统的后端API",
-    version="1.0.0"
-)
-
-# 配置CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],  # 允许的前端域名
-    allow_credentials=True,
-    allow_methods=["*"],  # 允许所有HTTP方法
-    allow_headers=["*"],  # 允许所有请求头
-)
 
 # ============================
 # Settings & JWT Config
@@ -66,6 +48,7 @@ engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Dependency
+
 def get_db():
     db = SessionLocal()
     try:
@@ -77,9 +60,9 @@ def get_db():
 # Auth helpers
 # ============================
 
-# 使用更兼容的密码加密方案
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -87,6 +70,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
+
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     token = credentials.credentials
@@ -100,9 +84,11 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Security(security))
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Return True if the password matches the hash."""
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password: str) -> str:
     """Return the bcrypt hash of the given password."""
@@ -120,15 +106,21 @@ class User(Base):
     name = Column(String(128))
     created_at = Column(DateTime, server_default=func.now())
 
-    # 移除错误的关系配置
     # activities = relationship("Activity", back_populates="club", foreign_keys="Activity.club_username")
+
 
 class Club(Base):
     __tablename__ = "clubs"
     username = Column(String(64), ForeignKey("users.username", ondelete="CASCADE"), primary_key=True)
     intro = Column(Text)
     user = relationship("User")
-    activities = relationship("Activity", back_populates="club")
+
+    # activities = relationship(
+        # "Activity",
+        # back_populates="club",
+        # cascade="all, delete-orphan",
+    # )
+
 
 class Activity(Base):
     __tablename__ = "activities"
@@ -160,8 +152,9 @@ class Activity(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    club = relationship("Club", back_populates="activities")
-    registrations = relationship("ActivityRegistration", back_populates="activity")
+    # club = relationship("Club", back_populates="activities")
+    # registrations = relationship("ActivityRegistration", back_populates="activity")
+
 
 class ActivityRegistration(Base):
     __tablename__ = "activity_registrations"
@@ -169,8 +162,8 @@ class ActivityRegistration(Base):
     username = Column(String(64), ForeignKey("users.username", ondelete="CASCADE"), primary_key=True)
     registered_at = Column(DateTime, server_default=func.now())
 
-    activity = relationship("Activity", back_populates="registrations")
-    user = relationship("User")
+    # activity = relationship("Activity", back_populates="registrations")
+    # user = relationship("User")
 
 # ============================
 # Pydantic Schemas
@@ -179,6 +172,7 @@ class ActivityRegistration(Base):
 class TokenData(BaseModel):
     username: str
     role: str
+
 
 class ActivityBase(BaseModel):
     title: str
@@ -199,8 +193,10 @@ class ActivityBase(BaseModel):
     activity_process: Optional[str] = None
     notes: Optional[str] = None
 
+
 class ActivityCreate(ActivityBase):
     pass
+
 
 class ActivityUpdate(BaseModel):
     title: Optional[str]
@@ -221,6 +217,7 @@ class ActivityUpdate(BaseModel):
     activity_process: Optional[str]
     notes: Optional[str]
 
+
 class ActivityOut(ActivityBase):
     id: int
     registered: int
@@ -229,7 +226,8 @@ class ActivityOut(ActivityBase):
     status: str
 
     class Config:
-        from_attributes = True
+        orm_mode = True
+
 
 class StatOut(BaseModel):
     total_activity_num: int
@@ -237,39 +235,51 @@ class StatOut(BaseModel):
     avg_likes: float
     category_breakdown: Dict[str, int]
 
+
 class ActivityStatusUpdate(BaseModel):
     status: str
 
+
 class RegisterRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=64)
-    password: str = Field(min_length=6, max_length=128)
-    role: str = Field(default="student")
+    username: str
+    password: str
+    role: str = "student"
     name: Optional[str] = None
     intro: Optional[str] = None
 
-    @field_validator('role')
-    @classmethod
-    def validate_role(cls, v):
-        if v not in ['student', 'club']:
-            raise ValueError('role must be either "student" or "club"')
-        return v
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: dict  # 添加用户信息字段
 
 # ============================
-# Utility permissions
+# FastAPI Application
 # ============================
+
+app = FastAPI(title="Campus Activity Backend", openapi_url="/api/openapi.json")
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],  # 允许的前端域名
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
+)
+
+# --------------------------------------------------
+# Utility permissions
+# --------------------------------------------------
 
 def ensure_role(token_data: dict, *roles):
     if token_data["role"] not in roles:
         raise HTTPException(status_code=403, detail="Insufficient privileges")
+
 
 def ensure_activity_ownership(db: Session, token_data: dict, activity_id: int):
     activity = db.query(Activity).filter(Activity.id == activity_id).first()
@@ -286,6 +296,7 @@ def ensure_activity_ownership(db: Session, token_data: dict, activity_id: int):
 # --------------------------------------------------
 # API endpoints
 # --------------------------------------------------
+
 
 @app.post("/api/register", response_model=TokenOut)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
@@ -307,16 +318,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
 
     token = create_access_token({"sub": user.username, "role": user.role})
-    
-    # 正确序列化用户对象
-    user_dict = {
-        "username": user.username,
-        "role": user.role,
-        "name": user.name,
-        "created_at": user.created_at.isoformat() if user.created_at else None
-    }
-    
-    return TokenOut(access_token=token, user=user_dict)
+    return TokenOut(access_token=token)
+
 
 @app.post("/api/login", response_model=TokenOut)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
@@ -325,21 +328,13 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = create_access_token({"sub": user.username, "role": user.role})
-    
-    # 正确序列化用户对象
-    user_dict = {
-        "username": user.username,
-        "role": user.role,
-        "name": user.name,
-        "created_at": user.created_at.isoformat() if user.created_at else None
-    }
-    
-    return TokenOut(access_token=token, user=user_dict)
+    return TokenOut(access_token=token)
 
 @app.get("/api/get-all-activities", response_model=List[ActivityOut])
 def get_all_activities(db: Session = Depends(get_db)):
     activities = db.query(Activity).all()
     return activities
+
 
 @app.post("/api/create-activity", response_model=int)
 def create_activity(activity: ActivityCreate, token=Depends(verify_token), db: Session = Depends(get_db)):
@@ -373,6 +368,7 @@ def create_activity(activity: ActivityCreate, token=Depends(verify_token), db: S
     db.refresh(new_act)
     return new_act.id
 
+
 @app.put("/api/modify-activity/{activity_id}")
 def modify_activity(activity_id: int, activity_update: ActivityUpdate, token=Depends(verify_token), db: Session = Depends(get_db)):
     activity = ensure_activity_ownership(db, token, activity_id)
@@ -382,12 +378,14 @@ def modify_activity(activity_id: int, activity_update: ActivityUpdate, token=Dep
     db.commit()
     return {"status": "succeeded"}
 
+
 @app.delete("/api/delete-activity/{activity_id}")
 def delete_activity(activity_id: int, token=Depends(verify_token), db: Session = Depends(get_db)):
     activity = ensure_activity_ownership(db, token, activity_id)
     db.delete(activity)
     db.commit()
     return {"status": "succeeded"}
+
 
 @app.get("/api/query-registered-activities", response_model=List[ActivityOut])
 def query_registered_activities(token=Depends(verify_token), db: Session = Depends(get_db)):
@@ -399,6 +397,7 @@ def query_registered_activities(token=Depends(verify_token), db: Session = Depen
     )
     return q.all()
 
+
 @app.post("/api/update-likes/{activity_id}")
 def update_likes(activity_id: int, token=Depends(verify_token), db: Session = Depends(get_db)):
     activity = db.query(Activity).filter(Activity.id == activity_id).first()
@@ -409,6 +408,7 @@ def update_likes(activity_id: int, token=Depends(verify_token), db: Session = De
     activity.rating_count += 1
     db.commit()
     return {"status": "succeeded"}
+
 
 @app.get("/api/get-activity-statistic", response_model=StatOut)
 def get_activity_statistic(token=Depends(verify_token), db: Session = Depends(get_db)):
@@ -435,6 +435,7 @@ def get_activity_statistic(token=Depends(verify_token), db: Session = Depends(ge
         category_breakdown=category_breakdown,
     )
 
+
 @app.patch("/api/update-activity-status/{activity_id}")
 def update_activity_status(
     activity_id: int,
@@ -451,13 +452,16 @@ def update_activity_status(
     db.commit()
     return {"status": "succeeded"}
 
+
 @app.get("/api/query-managed-activities", response_model=List[ActivityOut])
+
 def query_managed_activities(token=Depends(verify_token), db: Session = Depends(get_db)):
     ensure_role(token, "club", "admin")
     query = db.query(Activity)
     if token["role"] == "club":
         query = query.filter(Activity.club_username == token["username"])
     return query.all()
+
 
 @app.post("/api/register-activity/{activity_id}")
 def register_activity(activity_id: int, token=Depends(verify_token), db: Session = Depends(get_db)):

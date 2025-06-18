@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
+import api from '../utils/api';
 
 const LoginPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'student' | 'club' | 'admin'>('student');
@@ -33,64 +33,39 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // 表单验证
-    if (!username || !password) {
-      setFormError('用户名和密码不能为空');
-      return;
-    }
-
     setIsLoading(true);
     setFormError(null);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/login', {
-        username: username,
-        password: password,
+      const response = await api.post('/api/login', {
+        username,
+        password,
         role: activeTab
       });
 
-      const data = response.data;
+      console.log('登录响应:', response.data);
 
-      console.log('登录响应数据:', data);
-
-      // 检查返回的数据格式
-      if (!data.access_token) {
-        setFormError('服务器返回数据格式错误');
-        return;
-      }
-
-      // 使用UserContext的login方法
-      login(data.access_token, data.user);
-
-      // 根据角色跳转到不同页面
-      switch (data.user.role) {
-        case 'student':
-          navigate('/home');
-          break;
-        case 'club':
-          navigate('/club-activities');
-          break;
-        case 'admin':
+      if (response.data.access_token) {
+        // 后端只返回token，不返回用户信息
+        login(response.data.access_token);
+        
+        // 根据角色跳转到不同页面
+        if (activeTab === 'admin') {
           navigate('/audit');
-          break;
-        default:
-          navigate('/home');
+        } else if (activeTab === 'club') {
+          navigate('/activity-manage');
+        } else {
+          navigate('/');
+        }
+      } else {
+        setFormError('登录失败：未收到有效的token');
       }
-
     } catch (error: any) {
       console.error('登录错误:', error);
-      
-      if (error.response) {
-        // 服务器返回错误响应
-        const errorMessage = error.response.data?.detail || '登录失败，请检查用户名和密码';
-        setFormError(errorMessage);
-      } else if (error.request) {
-        // 网络错误
-        setFormError('网络连接失败，请检查网络设置');
+      if (error.response?.data?.detail) {
+        setFormError(`登录失败：${error.response.data.detail}`);
       } else {
-        // 其他错误
-        setFormError('登录过程中发生未知错误');
+        setFormError('登录失败，请检查网络连接');
       }
 
       setLoginAttempts(prev => prev + 1);
