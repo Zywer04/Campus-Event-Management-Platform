@@ -234,9 +234,9 @@ class ActivityStatusUpdate(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    username: constr(min_length=3, max_length=64)
-    password: constr(min_length=6, max_length=128)
-    role: constr(regex="^(student|club)$") = "student"
+    username: str
+    password: str
+    role: str = "student"
     name: Optional[str] = None
     intro: Optional[str] = None
 
