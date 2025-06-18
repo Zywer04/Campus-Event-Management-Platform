@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
-import { useActivities } from '../contexts/ActivityContext';
+import { useActivityContext } from '../contexts/ActivityContext';
 import api from '../utils/api';
 import type { ActivityCreateForm } from '../types/activityCreate';
 import { ACTIVITY_CATEGORIES, ACTIVITY_VALIDATION_RULES } from '../types/activityCreate';
@@ -11,7 +11,7 @@ import { ACTIVITY_CATEGORIES, ACTIVITY_VALIDATION_RULES } from '../types/activit
 const App: React.FC = () => {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const { user } = useUser();
-  const { refreshActivities } = useActivities();
+  const { refreshActivities } = useActivityContext();
   const [formData, setFormData] = useState<ActivityCreateForm>({
     title: '',
     category: '',

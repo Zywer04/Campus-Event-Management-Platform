@@ -133,13 +133,7 @@ const Layout: React.FC = () => {
           <div className="flex items-center space-x-6">
             {currentPage !== 'login' && (
               <form onSubmit={handleSearch} className="relative">
-                <input
-                  type="text"
-                  placeholder="搜索活动..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-64 h-10 pl-10 pr-4 text-sm border-none rounded-lg bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+
                 <button 
                   type="submit"
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600"

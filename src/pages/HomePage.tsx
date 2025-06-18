@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
-import { useActivities } from '../contexts/ActivityContext';
+import { useActivityContext } from '../contexts/ActivityContext';
 import ActivityCard from '../components/ActivityCard';
 import type { Activity } from '../types/activity';
 import api from '../utils/api';
@@ -14,7 +14,7 @@ const HomePage: React.FC = () => {
   const keyword = searchParams.get('keyword');
   const navigate = useNavigate();
   const { user } = useUser();
-  const { activities, loading, error, refreshActivities } = useActivities();
+  const { activities, loading, error, refreshActivities } = useActivityContext();
   
   // 输出当前用户身份信息
   useEffect(() => {
@@ -190,6 +190,61 @@ const HomePage: React.FC = () => {
 
       {/* 活动列表 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 统计概览 */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i className="fas fa-calendar text-blue-600"></i>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">总活动数</p>
+                  <p className="text-2xl font-bold text-gray-900">{activities.length}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i className="fas fa-users text-green-600"></i>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">总报名数</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {activities.reduce((sum: number, activity: Activity) => sum + activity.registered, 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i className="fas fa-star text-purple-600"></i>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">平均评分</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {activities.length > 0 
+                      ? (activities.reduce((sum: number, activity: Activity) => sum + activity.rating_total, 0) / 
+                         activities.reduce((sum: number, activity: Activity) => sum + activity.rating_count, 1)).toFixed(1)
+                      : '0.0'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 结果统计 */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900">

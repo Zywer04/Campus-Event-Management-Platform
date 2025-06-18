@@ -39,4 +39,23 @@ api.interceptors.response.use(
   }
 );
 
+// 活动统计数据接口
+export interface ActivityStats {
+  total_activity_num: number;
+  total_registered_num: number;
+  avg_likes: number;
+  category_breakdown: Record<string, number>;
+}
+
+// 获取活动统计数据
+export const getActivityStats = async (): Promise<ActivityStats> => {
+  try {
+    const response = await api.get('/api/get-activity-statistic');
+    return response.data;
+  } catch (error) {
+    console.error('获取活动统计数据失败:', error);
+    throw error;
+  }
+};
+
 export default api; 
