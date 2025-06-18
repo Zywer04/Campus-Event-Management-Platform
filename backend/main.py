@@ -233,6 +233,14 @@ class ActivityStatusUpdate(BaseModel):
     status: str
 
 
+class RegisterRequest(BaseModel):
+    username: constr(min_length=3, max_length=64)
+    password: constr(min_length=6, max_length=128)
+    role: constr(regex="^(student|club)$") = "student"
+    name: Optional[str] = None
+    intro: Optional[str] = None
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -273,6 +281,29 @@ def ensure_activity_ownership(db: Session, token_data: dict, activity_id: int):
 # --------------------------------------------------
 # API endpoints
 # --------------------------------------------------
+
+
+@app.post("/api/register", response_model=TokenOut)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Create a new user account and return its access token."""
+    if db.query(User).filter(User.username == payload.username).first():
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    user = User(
+        username=payload.username,
+        password_hash=get_password_hash(payload.password),
+        role=payload.role,
+        name=payload.name,
+    )
+    db.add(user)
+
+    if payload.role == "club":
+        db.add(Club(username=payload.username, intro=payload.intro))
+
+    db.commit()
+
+    token = create_access_token({"sub": user.username, "role": user.role})
+    return TokenOut(access_token=token)
 
 
 @app.post("/api/login", response_model=TokenOut)
