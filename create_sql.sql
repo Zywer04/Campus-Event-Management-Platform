@@ -132,3 +132,6 @@ BEGIN
     WHERE id = OLD.activity_id;
 END$$
 DELIMITER ;
+
+INSERT INTO users (username, password_hash, role, name)
+VALUES ('admin', '$2b$12$VO0pX2bS.7KJwtvxk3W6qOoyx.n6bW.TchyFjbVlyaincENHSS/Z2', 'admin', '管理员');
