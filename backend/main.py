@@ -15,6 +15,7 @@ from typing import List, Optional, Dict
 
 from fastapi import FastAPI, HTTPException, Depends, status, Security, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -262,6 +263,14 @@ class TokenOut(BaseModel):
 
 app = FastAPI(title="Campus Activity Backend", openapi_url="/api/openapi.json")
 
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],  # 允许的前端域名
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
+)
 
 # --------------------------------------------------
 # Utility permissions
