@@ -137,7 +137,7 @@ class Activity(Base):
     capacity = Column(Integer, nullable=False)
     rating_total = Column(Integer, default=0)
     rating_count = Column(Integer, default=0)
-    image_url = Column(String(255))
+    image_url = Column(String(1000))
     description = Column(Text)
     organizer = Column(String(64), ForeignKey("users.username"))
     organizer_contact = Column(String(64))
@@ -227,6 +227,35 @@ class ActivityOut(ActivityBase):
 
     class Config:
         orm_mode = True
+        
+    @classmethod
+    def from_orm(cls, obj):
+        # 自定义序列化方法，将time对象转换为字符串
+        data = {
+            'id': obj.id,
+            'title': obj.title,
+            'category': obj.category,
+            'date_start': obj.date_start,
+            'date_end': obj.date_end,
+            'time_start': obj.time_start.strftime('%H:%M') if obj.time_start else None,
+            'time_end': obj.time_end.strftime('%H:%M') if obj.time_end else None,
+            'location': obj.location,
+            'capacity': obj.capacity,
+            'image_url': obj.image_url,
+            'description': obj.description,
+            'organizer_contact': obj.organizer_contact,
+            'requirements': obj.requirements,
+            'registration_deadline': obj.registration_deadline,
+            'activity_summary': obj.activity_summary,
+            'activity_goals': obj.activity_goals,
+            'activity_process': obj.activity_process,
+            'notes': obj.notes,
+            'registered': obj.registered,
+            'rating_total': obj.rating_total,
+            'rating_count': obj.rating_count,
+            'status': obj.status,
+        }
+        return cls(**data)
 
 
 class StatOut(BaseModel):
@@ -333,13 +362,21 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 @app.get("/api/get-all-activities", response_model=List[ActivityOut])
 def get_all_activities(db: Session = Depends(get_db)):
     activities = db.query(Activity).all()
-    return activities
+    return [ActivityOut.from_orm(activity) for activity in activities]
 
 
 @app.post("/api/create-activity", response_model=int)
 def create_activity(activity: ActivityCreate, token=Depends(verify_token), db: Session = Depends(get_db)):
     ensure_role(token, "club", "admin")
     status_value = "审核中" if token["role"] == "club" else "报名中"  # admin直接通过
+    
+    # 处理image_url长度问题
+    image_url = activity.image_url
+    if image_url and len(image_url) > 1000:
+        # 如果URL太长，截断到1000字符或者使用默认图片
+        print(f"警告: image_url长度({len(image_url)})超过1000字符，将被截断")
+        image_url = image_url[:1000]
+    
     new_act = Activity(
         title=activity.title,
         apply_time=datetime.utcnow(),
@@ -350,7 +387,7 @@ def create_activity(activity: ActivityCreate, token=Depends(verify_token), db: S
         time_end=activity.time_end,
         location=activity.location,
         capacity=activity.capacity,
-        image_url=activity.image_url,
+        image_url=image_url,
         description=activity.description,
         organizer=token["username"],
         organizer_contact=activity.organizer_contact,
@@ -372,7 +409,15 @@ def create_activity(activity: ActivityCreate, token=Depends(verify_token), db: S
 @app.put("/api/modify-activity/{activity_id}")
 def modify_activity(activity_id: int, activity_update: ActivityUpdate, token=Depends(verify_token), db: Session = Depends(get_db)):
     activity = ensure_activity_ownership(db, token, activity_id)
-    for field, value in activity_update.dict(exclude_unset=True).items():
+    
+    # 处理image_url长度问题
+    update_data = activity_update.dict(exclude_unset=True)
+    if 'image_url' in update_data and update_data['image_url']:
+        if len(update_data['image_url']) > 1000:
+            print(f"警告: image_url长度({len(update_data['image_url'])})超过1000字符，将被截断")
+            update_data['image_url'] = update_data['image_url'][:1000]
+    
+    for field, value in update_data.items():
         setattr(activity, field, value)
     activity.updated_at = datetime.utcnow()
     db.commit()
@@ -395,7 +440,8 @@ def query_registered_activities(token=Depends(verify_token), db: Session = Depen
         .join(ActivityRegistration)
         .filter(ActivityRegistration.username == token["username"])
     )
-    return q.all()
+    activities = q.all()
+    return [ActivityOut.from_orm(activity) for activity in activities]
 
 
 @app.post("/api/update-likes/{activity_id}")
@@ -454,13 +500,13 @@ def update_activity_status(
 
 
 @app.get("/api/query-managed-activities", response_model=List[ActivityOut])
-
 def query_managed_activities(token=Depends(verify_token), db: Session = Depends(get_db)):
     ensure_role(token, "club", "admin")
     query = db.query(Activity)
     if token["role"] == "club":
         query = query.filter(Activity.club_username == token["username"])
-    return query.all()
+    activities = query.all()
+    return [ActivityOut.from_orm(activity) for activity in activities]
 
 
 @app.post("/api/register-activity/{activity_id}")

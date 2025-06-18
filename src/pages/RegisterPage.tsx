@@ -75,8 +75,14 @@ const RegisterPage: React.FC = () => {
       // 注册成功，自动登录
       setFormSuccess('注册成功！正在自动登录...');
 
-      // 使用UserContext的login方法
-      login(data.access_token, data.user);
+      // 使用UserContext的login方法，传递用户信息
+      const userInfo = {
+        id: 0, // 暂时使用默认值
+        username: formData.username,
+        role: activeTab, // 使用前端选择的角色
+        name: formData.name || formData.username
+      };
+      login(data.access_token, userInfo);
 
       // 延迟跳转，让用户看到成功消息
       setTimeout(() => {
@@ -86,7 +92,7 @@ const RegisterPage: React.FC = () => {
             navigate('/home');
             break;
           case 'club':
-            navigate('/club-activities');
+            navigate('/ClubActivities');
             break;
           default:
             navigate('/home');

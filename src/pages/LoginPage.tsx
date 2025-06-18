@@ -45,15 +45,30 @@ const LoginPage: React.FC = () => {
 
       console.log('登录响应:', response.data);
 
+      // 输出后端返回的身份信息
+      console.log('🔍 后端返回的身份信息:', {
+        token: response.data.access_token,
+        tokenType: response.data.token_type,
+        rome: activeTab, // 前端选择的角色
+        timestamp: new Date().toLocaleString()
+      });
+
       if (response.data.access_token) {
         // 后端只返回token，不返回用户信息
-        login(response.data.access_token);
+        // 传递用户信息给UserContext，包括前端选择的角色
+        const userInfo = {
+          id: 0, // 暂时使用默认值
+          username: username,
+          role: activeTab, // 使用前端选择的角色
+          name: username // 暂时使用用户名作为姓名
+        };
+        login(response.data.access_token, userInfo);
         
         // 根据角色跳转到不同页面
         if (activeTab === 'admin') {
           navigate('/audit');
         } else if (activeTab === 'club') {
-          navigate('/activity-manage');
+          navigate('/ActivityManage');
         } else {
           navigate('/');
         }

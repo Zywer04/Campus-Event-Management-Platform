@@ -1,72 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
+import api from '../utils/api';
+import type { Activity } from '../types/activity';
+import { STATUS_COLORS, CATEGORY_ICONS, CATEGORY_COLORS } from '../types/activity';
 
 const RegisteredActivities: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activities, setActivities] = useState([
-    {
-      id: '1',
-      title: '校园马拉松比赛',
-      status: 'success',
-      time: '2025-06-15 08:00',
-      location: '校园体育场',
-      image: 'https://readdy.ai/api/search-image?query=A%2520dynamic%2520university%2520marathon%2520event%2520with%2520students%2520running%2520through%2520a%2520beautiful%2520campus%2520setting%2520modern%2520buildings%2520and%2520green%2520spaces%2520in%2520background%2520professional%2520photography&width=400&height=250&seq=1&orientation=landscape'
-    },
-    {
-      id: '2',
-      title: '创新创业大赛',
-      status: 'pending',
-      time: '2025-06-20 14:00',
-      location: '创新创业中心',
-      image: 'https://readdy.ai/api/search-image?query=Students%2520presenting%2520innovative%2520projects%2520in%2520a%2520modern%2520conference%2520room%2520with%2520professional%2520setup%2520and%2520technology%2520displays%2520engaging%2520atmosphere&width=400&height=250&seq=2&orientation=landscape'
-    },
-    {
-      id: '3',
-      title: '毕业晚会',
-      status: 'ended',
-      time: '2025-06-10 19:00',
-      location: '大学生活动中心',
-      image: 'https://readdy.ai/api/search-image?query=Graduation%2520ceremony%2520celebration%2520in%2520a%2520grand%2520university%2520hall%2520with%2520elegant%2520decorations%2520and%2520lighting%2520setup%2520formal%2520event%2520atmosphere&width=400&height=250&seq=3&orientation=landscape'
-    },
-    {
-      id: '4',
-      title: '学术讲座系列',
-      status: 'success',
-      time: '2025-06-25 15:00',
-      location: '图书馆报告厅',
-      image: 'https://readdy.ai/api/search-image?query=Academic%2520lecture%2520in%2520modern%2520university%2520auditorium%2520with%2520professional%2520presentation%2520setup%2520and%2520engaged%2520student%2520audience%2520learning%2520atmosphere&width=400&height=250&seq=4&orientation=landscape'
-    }
-  ]);
-
+  const { user } = useUser();
+  
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
-  const statusColors = {
-    success: 'bg-green-100 text-green-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    ended: 'bg-gray-100 text-gray-800'
+  useEffect(() => {
+    fetchRegisteredActivities();
+  }, []);
+
+  const fetchRegisteredActivities = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get('/api/query-registered-activities');
+      console.log('🔍 已报名活动数据:', response.data);
+      setActivities(response.data);
+    } catch (err: any) {
+      console.error('获取已报名活动失败:', err);
+      setError('获取已报名活动失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const statusText = {
-    success: '报名成功',
-    pending: '待审核',
-    ended: '已结束'
-  };
-
-  const handleCancelRegistration = (activityId: string) => {
+  const handleCancelRegistration = (activityId: number) => {
     setSelectedActivityId(activityId);
     setShowCancelModal(true);
   };
 
-  const confirmCancel = () => {
+  const confirmCancel = async () => {
     if (selectedActivityId) {
-      setActivities(prev =>
-        prev.filter(activity => activity.id !== selectedActivityId)
-      );
+      try {
+        // 这里可以调用取消报名的API
+        console.log('取消报名活动:', selectedActivityId);
+        // 暂时从本地状态中移除
+        setActivities(prev => prev.filter(activity => activity.id !== selectedActivityId));
+        alert('取消报名成功');
+      } catch (err) {
+        console.error('取消报名失败:', err);
+        alert('取消报名失败');
+      }
     }
     setShowCancelModal(false);
     setSelectedActivityId(null);
@@ -75,6 +63,22 @@ const RegisteredActivities: React.FC = () => {
   const filteredActivities = activities.filter(activity =>
     statusFilter === 'all' ? true : activity.status === statusFilter
   );
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('zh-CN');
+  };
+
+  const formatTime = (timeString: string) => {
+    return timeString;
+  };
+
+  const formatDateTime = (dateTimeString: string) => {
+    return new Date(dateTimeString).toLocaleString('zh-CN');
+  };
+
+  const getRegistrationProgress = (activity: Activity) => {
+    return (activity.registered / activity.capacity) * 100;
+  };
 
   // 处理导航
   const handleNavigation = (path: string) => {
@@ -107,6 +111,35 @@ const RegisteredActivities: React.FC = () => {
     { id: 'clubStats', name: '社团活动数据', icon: 'fa-chart-line', path: '/ClubStats' },
     { id: 'clubApply', name: '申报活动', icon: 'fa-file-signature', path: '/ClubApply' },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">加载失败</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchRegisteredActivities}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            重试
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -219,95 +252,212 @@ const RegisteredActivities: React.FC = () => {
         </div>
       </div>
 
-      {/* 主内容 */}
-      <main className="ml-64 pt-16 min-h-screen">
-        <div className="max-w-[1176px] mx-auto px-6 py-8">
-          {/* 顶部操作区 */}
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-semibold">已报名活动（{filteredActivities.length}）</h2>
-            <div className="flex items-center space-x-4">
-              <div className="flex bg-white rounded-lg border border-gray-200">
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`px-4 py-2 ${viewMode === 'list' ? 'text-purple-600' : 'text-gray-600'}`}
-                  aria-label="列表视图"
-                >
-                  <i className="fas fa-list-ul"></i>
-                </button>
-                <button
-                  onClick={() => setViewMode('calendar')}
-                  className={`px-4 py-2 ${viewMode === 'calendar' ? 'text-purple-600' : 'text-gray-600'}`}
-                  aria-label="日历视图"
-                >
-                  <i className="fas fa-calendar-alt"></i>
-                </button>
-              </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 bg-white rounded-lg border border-gray-200 text-gray-700"
-                aria-label="活动状态筛选"
+      {/* 主内容区域 */}
+      <div className="ml-64 pt-16">
+        <div className="p-8">
+          {/* 页面标题 */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">已报名活动</h1>
+            <p className="text-gray-600">查看您已报名的所有活动</p>
+          </div>
+
+          {/* 筛选和视图切换 */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+            {/* 状态筛选 */}
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  statusFilter === 'all'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                <option value="all">全部状态</option>
-                <option value="success">报名成功</option>
-                <option value="pending">待审核</option>
-                <option value="ended">已结束</option>
-              </select>
+                全部
+              </button>
+              <button
+                onClick={() => setStatusFilter('报名中')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  statusFilter === '报名中'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                报名中
+              </button>
+              <button
+                onClick={() => setStatusFilter('审核中')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  statusFilter === '审核中'
+                    ? 'bg-yellow-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                审核中
+              </button>
+              <button
+                onClick={() => setStatusFilter('已结束')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  statusFilter === '已结束'
+                    ? 'bg-gray-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                已结束
+              </button>
+            </div>
+
+            {/* 视图切换 */}
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                aria-label="列表视图"
+              >
+                <i className="fas fa-list"></i>
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === 'calendar'
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                aria-label="日历视图"
+              >
+                <i className="fas fa-calendar-alt"></i>
+              </button>
             </div>
           </div>
 
-          {/* 活动卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredActivities.map((activity) => (
-              <div key={activity.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="aspect-w-16 aspect-h-10">
-                  <img src={activity.image} alt={activity.title} className="w-full h-full object-cover" />
-                </div>
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{activity.title}</h3>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[activity.status as keyof typeof statusColors]}`}>
-                      {statusText[activity.status as keyof typeof statusText]}
-                    </span>
+          {/* 活动列表 */}
+          {filteredActivities.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredActivities.map((activity) => (
+                <div key={activity.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                  {/* 活动图片 */}
+                  <div className="relative h-48 bg-gradient-to-br from-blue-400 to-purple-600">
+                    {activity.image_url ? (
+                      <img 
+                        src={activity.image_url} 
+                        alt={activity.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <i className={`${CATEGORY_ICONS[activity.category as keyof typeof CATEGORY_ICONS]} text-white text-4xl`}></i>
+                      </div>
+                    )}
+                    
+                    {/* 状态标签 */}
+                    <div className="absolute top-3 left-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[activity.status as keyof typeof STATUS_COLORS]}`}>
+                        {activity.status}
+                      </span>
+                    </div>
+                    
+                    {/* 分类标签 */}
+                    <div className="absolute top-3 right-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[activity.category as keyof typeof CATEGORY_COLORS]}`}>
+                        {activity.category}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500 mb-3">
-                    <p><i className="fas fa-clock mr-2"></i>{activity.time}</p>
-                    <p><i className="fas fa-map-marker-alt mr-2"></i>{activity.location}</p>
-                  </div>
-                  <button
-                    onClick={() => handleCancelRegistration(activity.id)}
-                    className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                    aria-label={`取消报名${activity.title}`}
-                  >
-                    取消报名
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
 
-      {/* 取消确认弹窗 */}
+                  {/* 活动信息 */}
+                  <div className="p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                      {activity.title}
+                    </h3>
+                    
+                    <div className="space-y-2 text-sm text-gray-600 mb-4">
+                      <div className="flex items-center">
+                        <i className="fas fa-calendar-alt w-4 mr-2"></i>
+                        <span>{formatDate(activity.date_start)} - {formatDate(activity.date_end)}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <i className="fas fa-clock w-4 mr-2"></i>
+                        <span>{formatTime(activity.time_start)} - {formatTime(activity.time_end)}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <i className="fas fa-map-marker-alt w-4 mr-2"></i>
+                        <span>{activity.location}</span>
+                      </div>
+                    </div>
+
+                    {/* 报名进度 */}
+                    <div className="mb-4">
+                      <div className="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>报名进度</span>
+                        <span>{activity.registered}/{activity.capacity}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${getRegistrationProgress(activity)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* 操作按钮 */}
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => navigate(`/activities/${activity.id}`)}
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        查看详情
+                      </button>
+                      {activity.status === '报名中' && (
+                        <button
+                          onClick={() => handleCancelRegistration(activity.id)}
+                          className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                        >
+                          取消报名
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <i className="fas fa-calendar-times text-gray-400 text-6xl mb-4"></i>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">暂无已报名活动</h3>
+              <p className="text-gray-600 mb-6">您还没有报名任何活动</p>
+              <button
+                onClick={() => navigate('/')}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                浏览活动
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 取消报名确认弹窗 */}
       {showCancelModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-[400px]">
-            <h3 className="text-lg font-semibold mb-2">确认取消报名</h3>
-            <p className="text-gray-600 mb-6">是否确认取消报名该活动？取消后需要重新报名。</p>
-            <div className="flex justify-end space-x-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">确认取消报名</h3>
+            <p className="text-gray-600 mb-6">确定要取消报名这个活动吗？此操作不可撤销。</p>
+            <div className="flex space-x-4">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                aria-label="取消操作"
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={confirmCancel}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                aria-label="确认取消报名"
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
               >
-                确认
+                确认取消
               </button>
             </div>
           </div>

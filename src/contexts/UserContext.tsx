@@ -60,6 +60,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const login = (newToken: string, newUser?: any) => {
     setToken(newToken);
     
+    // 输出解析后的身份信息
+    console.log('🔍 UserContext解析的身份信息:', {
+      token: newToken,
+      providedUser: newUser,
+      timestamp: new Date().toLocaleString()
+    });
+    
     // 如果没有提供用户信息，从token中解析用户信息
     if (!newUser) {
       try {

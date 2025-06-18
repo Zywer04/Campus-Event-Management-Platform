@@ -27,7 +27,7 @@ const Layout: React.FC = () => {
       setCurrentPage('activity');
     } else if (path === '/ActivityManage') {
       setCurrentPage('manage');
-    } else if (path === '/AuditPage') {
+    } else if (path === '/audit') {
       setCurrentPage('audit');
     } else if (path === '/ClubActivities') {
       setCurrentPage('clubActivities');
@@ -47,6 +47,8 @@ const Layout: React.FC = () => {
       setCurrentPage('register');
     } else if (path === '/login') {
       setCurrentPage('login');
+    } else if (path.startsWith('/activities/')) {
+      setCurrentPage('activity');
     }
   }, [location.pathname, location.search]);
 

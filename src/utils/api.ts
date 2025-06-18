@@ -2,18 +2,17 @@ import axios from 'axios';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'http://localhost:8000', // 后端服务器地址
-  timeout: 10000, // 请求超时时间
+  baseURL: '', // 移除baseURL，直接使用相对路径
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// 请求拦截器
+// 请求拦截器 - 添加token
 api.interceptors.request.use(
   (config) => {
-    // 从localStorage获取token
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,22 +23,16 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器
+// 响应拦截器 - 处理错误
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    // 处理401未授权错误
     if (error.response?.status === 401) {
-      // 清除本地存储的token
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user_role');
-      localStorage.removeItem('user_id');
-      localStorage.removeItem('username');
-      localStorage.removeItem('user_name');
-      
-      // 重定向到登录页
+      // token过期或无效，清除本地存储并跳转到登录页
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       window.location.href = '/login';
     }
     return Promise.reject(error);
