@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
-import { getManagedActivities } from '../utils/api';
+import { getManagedActivities, updateActivity, deleteActivity } from '../utils/api';
 
 const ClubActivities: React.FC = () => {
   const navigate = useNavigate();
@@ -51,9 +51,12 @@ const ClubActivities: React.FC = () => {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
 
   // 获取社团管理的活动列表
   const fetchManagedActivities = async () => {
@@ -96,6 +99,8 @@ const ClubActivities: React.FC = () => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowDetailModal(false);
+        setShowEditModal(false);
+        setShowDeleteModal(false);
       }
     };
 
@@ -113,6 +118,69 @@ const ClubActivities: React.FC = () => {
   const handleActivityClick = (activity: any) => {
     setSelectedActivity(activity);
     setShowDetailModal(true);
+  };
+
+  // 打开编辑模态框
+  const handleEditClick = (activity: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedActivity(activity);
+    setEditForm({
+      title: activity.title,
+      category: activity.category,
+      date_start: activity.date_start.split('T')[0],
+      date_end: activity.date_end.split('T')[0],
+      time_start: activity.time_start,
+      time_end: activity.time_end,
+      location: activity.location,
+      capacity: activity.capacity,
+      image_url: activity.image_url || '',
+      description: activity.description || '',
+      organizer_contact: activity.organizer_contact || '',
+      requirements: activity.requirements || '',
+      registration_deadline: activity.registration_deadline.split('T')[0] + 'T' + activity.registration_deadline.split('T')[1].substring(0, 5),
+      activity_summary: activity.activity_summary || '',
+      activity_goals: activity.activity_goals || '',
+      activity_process: activity.activity_process || '',
+      notes: activity.notes || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // 打开删除确认模态框
+  const handleDeleteClick = (activity: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedActivity(activity);
+    setShowDeleteModal(true);
+  };
+
+  // 处理编辑表单提交
+  const handleEditSubmit = async () => {
+    if (!selectedActivity) return;
+    
+    try {
+      await updateActivity(selectedActivity.id, editForm);
+      alert('活动更新成功！');
+      setShowEditModal(false);
+      fetchManagedActivities(); // 重新获取数据
+    } catch (error) {
+      console.error('更新活动失败:', error);
+      alert('更新活动失败，请重试');
+    }
+  };
+
+  // 处理删除确认
+  const handleDeleteConfirm = async () => {
+    if (!selectedActivity) return;
+    
+    try {
+      await deleteActivity(selectedActivity.id);
+      alert('活动删除成功！');
+      setShowDeleteModal(false);
+      fetchManagedActivities(); // 重新获取数据
+    } catch (error) {
+      console.error('删除活动失败:', error);
+      alert('删除活动失败，请重试');
+    }
   };
 
   // 过滤活动列表
@@ -148,9 +216,9 @@ const ClubActivities: React.FC = () => {
                 首页
               </button>
               <button
-                onClick={() => handleNavigation('/club-activities')}
+                onClick={() => handleNavigation('/ClubActivities')}
                 className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/club-activities' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'
+                  location.pathname === '/ClubActivities' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 社团活动
@@ -323,8 +391,17 @@ const ClubActivities: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors cursor-pointer whitespace-nowrap">
-                            查看详情
+                          <button
+                            onClick={(e) => handleEditClick(activity, e)}
+                            className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors cursor-pointer whitespace-nowrap mr-2"
+                          >
+                            编辑
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteClick(activity, e)}
+                            className="px-3 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            删除
                           </button>
                         </td>
                       </tr>
@@ -347,6 +424,7 @@ const ClubActivities: React.FC = () => {
                 <button
                   onClick={() => setShowDetailModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="关闭详情模态框"
                 >
                   <i className="fas fa-times text-xl"></i>
                 </button>
@@ -431,6 +509,167 @@ const ClubActivities: React.FC = () => {
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 编辑模态框 */}
+      {showEditModal && selectedActivity && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">编辑活动</h2>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="关闭编辑模态框"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">活动标题</h3>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入活动标题"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">活动分类</h3>
+                  <input
+                    type="text"
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入活动分类"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">活动地点</h3>
+                  <input
+                    type="text"
+                    value={editForm.location}
+                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入活动地点"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">活动容量</h3>
+                  <input
+                    type="number"
+                    value={editForm.capacity}
+                    onChange={(e) => setEditForm({ ...editForm, capacity: parseInt(e.target.value) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入活动容量"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">开始时间</h3>
+                  <input
+                    type="date"
+                    value={editForm.date_start}
+                    onChange={(e) => setEditForm({ ...editForm, date_start: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="选择活动开始日期"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">结束时间</h3>
+                  <input
+                    type="date"
+                    value={editForm.date_end}
+                    onChange={(e) => setEditForm({ ...editForm, date_end: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="选择活动结束日期"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">活动描述</h3>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入活动描述"
+                    rows={3}
+                  ></textarea>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">参与要求</h3>
+                  <textarea
+                    value={editForm.requirements}
+                    onChange={(e) => setEditForm({ ...editForm, requirements: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入参与要求"
+                    rows={3}
+                  ></textarea>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">报名截止</h3>
+                  <input
+                    type="datetime-local"
+                    value={editForm.registration_deadline}
+                    onChange={(e) => setEditForm({ ...editForm, registration_deadline: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="选择报名截止时间"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleEditSubmit}
+                  className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除确认模态框 */}
+      {showDeleteModal && selectedActivity && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">确认删除活动</h2>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="关闭删除模态框"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              <p className="text-gray-900">确定要删除活动 "{selectedActivity.title}"?</p>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  删除
                 </button>
               </div>
             </div>

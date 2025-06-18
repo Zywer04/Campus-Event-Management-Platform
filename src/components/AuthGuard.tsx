@@ -27,7 +27,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
       case 'student':
         return <Navigate to="/home" replace />;
       case 'club':
-        return <Navigate to="/club-activities" replace />;
+        return <Navigate to="/ClubActivities" replace />;
       case 'admin':
         return <Navigate to="/audit" replace />;
       default:

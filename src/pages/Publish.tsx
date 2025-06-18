@@ -268,7 +268,7 @@ const App: React.FC = () => {
       
       // 根据用户角色跳转到不同页面
       if (user?.role === 'club') {
-        navigate('/club-activities'); // 跳转到社团活动管理页面
+        navigate('/ClubActivities'); // 跳转到社团活动管理页面
       } else {
         navigate('/'); // 管理员跳转到首页
       }

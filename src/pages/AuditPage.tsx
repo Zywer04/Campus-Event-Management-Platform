@@ -401,10 +401,10 @@ const AuditPage: React.FC = () => {
                           <div className="text-sm font-medium text-gray-900">{activity.title}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-700">{activity.club}</div>
+                          <div className="text-sm text-gray-700">{activity.club_username || activity.organizer}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-700">{activity.applyTime}</div>
+                          <div className="text-sm text-gray-700">{new Date(activity.apply_time).toLocaleString('zh-CN')}</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-700">
@@ -491,6 +491,7 @@ const AuditPage: React.FC = () => {
               <button
                 onClick={() => setShowDetailModal(false)}
                 className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                aria-label="关闭详情模态框"
               >
                 <i className="fas fa-times text-xl"></i>
               </button>
@@ -504,7 +505,7 @@ const AuditPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">申请社团</h3>
-                  <p className="text-gray-900">{selectedActivity.club}</p>
+                  <p className="text-gray-900">{selectedActivity.club_username || selectedActivity.organizer}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">活动类型</h3>
@@ -512,7 +513,7 @@ const AuditPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">申请时间</h3>
-                  <p className="text-gray-900">{selectedActivity.applyTime}</p>
+                  <p className="text-gray-900">{new Date(selectedActivity.apply_time).toLocaleString('zh-CN')}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">活动地点</h3>
@@ -530,7 +531,10 @@ const AuditPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">活动时间</h3>
-                  <p className="text-gray-900">{selectedActivity.startTime} - {selectedActivity.endTime}</p>
+                  <p className="text-gray-900">
+                    {new Date(selectedActivity.date_start).toLocaleDateString('zh-CN')} {selectedActivity.time_start} - 
+                    {new Date(selectedActivity.date_end).toLocaleDateString('zh-CN')} {selectedActivity.time_end}
+                  </p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">参与人数限制</h3>
@@ -559,7 +563,7 @@ const AuditPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">联系方式</h3>
-                  <p className="text-gray-900">{selectedActivity.contact}</p>
+                  <p className="text-gray-900">{selectedActivity.organizer_contact || '暂无'}</p>
                 </div>
               </div>
 

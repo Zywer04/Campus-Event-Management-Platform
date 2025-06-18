@@ -122,4 +122,56 @@ export const getManagedActivities = async (): Promise<any[]> => {
   }
 };
 
+// 活动更新接口
+export interface ActivityUpdateData {
+  title?: string;
+  category?: string;
+  date_start?: string;
+  date_end?: string;
+  time_start?: string;
+  time_end?: string;
+  location?: string;
+  capacity?: number;
+  image_url?: string;
+  description?: string;
+  organizer_contact?: string;
+  requirements?: string;
+  registration_deadline?: string;
+  activity_summary?: string;
+  activity_goals?: string;
+  activity_process?: string;
+  notes?: string;
+}
+
+// 编辑活动
+export const updateActivity = async (activityId: number, activityData: ActivityUpdateData): Promise<void> => {
+  try {
+    await api.put(`/api/modify-activity/${activityId}`, activityData);
+  } catch (error) {
+    console.error('编辑活动失败:', error);
+    throw error;
+  }
+};
+
+// 删除活动
+export const deleteActivity = async (activityId: number): Promise<void> => {
+  try {
+    await api.delete(`/api/delete-activity/${activityId}`);
+  } catch (error) {
+    console.error('删除活动失败:', error);
+    throw error;
+  }
+};
+
+// 获取所有活动（管理员使用）
+export const getAllActivities = async (): Promise<any[]> => {
+  try {
+    const response = await api.get('/api/get-all-activities');
+    return response.data;
+  } catch (error) {
+    console.error('获取所有活动失败:', error);
+    throw error;
+  }
+};
+
 export default api; 
