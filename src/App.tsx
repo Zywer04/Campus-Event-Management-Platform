@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from './components/Layout';
+import AuthGuard from './components/AuthGuard';
+import { UserProvider } from './contexts/UserContext';
 
 import HomePage from "./pages/HomePage";
 import RegisteredActivities from './pages/RegisteredActivities';
@@ -17,28 +19,86 @@ import AuditPage from './pages/AuditPage';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* 所有页面都在 Layout 中渲染（除了 login） */}
-        <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/activities/:id" element={<ActivityDetail />} />
-          <Route path="/registered" element={<RegisteredActivities />} />
-          <Route path="/activities/history" element={<HistoryPage />} />
-          <Route path="/publish" element={<Publish />} />
-          <Route path="/ActivityManage" element={<ActivityManage />} />
-          <Route path="/Stats" element={<Stats />} />
-          <Route path="/ClubActivities" element={<ClubActivities />} />
-          <Route path="/ClubStats" element={<ClubStats />} />
-          <Route path="/ClubApply" element={<ClubApply />} />
+    <UserProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* 登录页面不需要认证 */}
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/AuditPage" element={<AuditPage />} />
-        </Route>
 
-        {/* login 页面不使用 Layout */}
-        <Route path="/login" element={<LoginPage />} />
-      </Routes>
-    </BrowserRouter>
+          {/* 需要认证的页面 */}
+          <Route element={<Layout />}>
+            {/* 所有用户都可以访问的页面 */}
+            <Route path="/" element={
+              <AuthGuard allowedRoles={['student', 'club', 'admin']}>
+                <HomePage />
+              </AuthGuard>
+            } />
+            <Route path="/home" element={
+              <AuthGuard allowedRoles={['student', 'club', 'admin']}>
+                <HomePage />
+              </AuthGuard>
+            } />
+            <Route path="/activities/:id" element={
+              <AuthGuard allowedRoles={['student', 'club', 'admin']}>
+                <ActivityDetail />
+              </AuthGuard>
+            } />
+
+            {/* 学生专用页面 */}
+            <Route path="/registered" element={
+              <AuthGuard allowedRoles={['student']}>
+                <RegisteredActivities />
+              </AuthGuard>
+            } />
+            <Route path="/activities/history" element={
+              <AuthGuard allowedRoles={['student']}>
+                <HistoryPage />
+              </AuthGuard>
+            } />
+
+            {/* 社团和管理员都可以访问的页面 */}
+            <Route path="/club-activities" element={
+              <AuthGuard allowedRoles={['club']}>
+                <ClubActivities />
+              </AuthGuard>
+            } />
+            <Route path="/publish" element={
+              <AuthGuard allowedRoles={['club', 'admin']}>
+                <Publish />
+              </AuthGuard>
+            } />
+            <Route path="/ActivityManage" element={
+              <AuthGuard allowedRoles={['club', 'admin']}>
+                <ActivityManage />
+              </AuthGuard>
+            } />
+            <Route path="/ClubStats" element={
+              <AuthGuard allowedRoles={['club']}>
+                <ClubStats />
+              </AuthGuard>
+            } />
+            <Route path="/ClubApply" element={
+              <AuthGuard allowedRoles={['club']}>
+                <ClubApply />
+              </AuthGuard>
+            } />
+
+            {/* 管理员专用页面 */}
+            <Route path="/audit" element={
+              <AuthGuard allowedRoles={['admin']}>
+                <AuditPage />
+              </AuthGuard>
+            } />
+            <Route path="/Stats" element={
+              <AuthGuard allowedRoles={['admin']}>
+                <Stats />
+              </AuthGuard>
+            } />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </UserProvider>
   );
 }
 

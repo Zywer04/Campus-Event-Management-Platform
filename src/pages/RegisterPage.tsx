@@ -1,205 +1,346 @@
 import React, { useState } from 'react';
-import * as echarts from 'echarts';
-
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
 
 const RegisterPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'student' | 'club'>('student');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [formData, setFormData] = useState({
-    activity_id: 1,
+    username: '',
+    password: '',
+    confirmPassword: '',
     name: '',
-    studentId: '',
-    phone: '',
-    email: '',
-    department: '',
-    grade: ''
+    intro: ''
   });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const navigate = useNavigate();
+  const { login } = useUser();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // 清除错误信息
+    if (formError) setFormError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const response = await fetch('http://localhost:8000/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(formData)
-    });
-
-    const result = await response.json();
-    if (response.ok) {
-      alert("报名成功！");
-    } else {
-      alert("报名失败：" + result.message);
+    // 表单验证
+    if (!formData.username || !formData.password || !formData.confirmPassword) {
+      setFormError('请填写所有必填字段');
+      return;
     }
-  } catch (error) {
-    console.error("提交出错", error);
-    alert("提交出错");
-  }
-};
 
+    if (formData.password !== formData.confirmPassword) {
+      setFormError('两次输入的密码不一致');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setFormError('密码长度至少6位');
+      return;
+    }
+
+    if (formData.username.length < 3) {
+      setFormError('用户名长度至少3位');
+      return;
+    }
+
+    setIsLoading(true);
+    setFormError(null);
+    setFormSuccess(null);
+
+    try {
+      const response = await axios.post('http://localhost:8000/api/register', {
+        username: formData.username,
+        password: formData.password,
+        role: activeTab,
+        name: formData.name || undefined,
+        intro: activeTab === 'club' ? formData.intro : undefined
+      });
+
+      const data = response.data;
+
+      console.log('注册响应数据:', data);
+
+      // 注册成功，自动登录
+      setFormSuccess('注册成功！正在自动登录...');
+
+      // 使用UserContext的login方法
+      login(data.access_token, data.user);
+
+      // 延迟跳转，让用户看到成功消息
+      setTimeout(() => {
+        // 根据角色跳转到不同页面
+        switch (activeTab) {
+          case 'student':
+            navigate('/home');
+            break;
+          case 'club':
+            navigate('/club-activities');
+            break;
+          default:
+            navigate('/home');
+        }
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('注册错误:', error);
+      
+      if (error.response) {
+        const errorMessage = error.response.data?.detail || '注册失败，请重试';
+        setFormError(errorMessage);
+      } else if (error.request) {
+        setFormError('网络连接失败，请检查网络设置');
+      } else {
+        setFormError('注册过程中发生未知错误');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getTabLabel = (tab: 'student' | 'club') => {
+    switch (tab) {
+      case 'student': return '学生注册';
+      case 'club': return '社团注册';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-white shadow-sm z-50">
-        <div className="max-w-[1440px] mx-auto px-6 h-full flex items-center">
-          <a
-            href="https://readdy.ai/home/b0cf731b-de36-44f8-8c9f-e57d09ede402/446a40e3-0c00-4354-93ed-34b1ad9576e3"
-            data-readdy="true"
-            className="flex items-center space-x-3 text-gray-600 hover:text-purple-600"
-          >
-            <i className="fas fa-arrow-left"></i>
-            <span>返回活动列表</span>
-          </a>
-          <h1 className="text-lg font-semibold text-center flex-1">活动详情</h1>
+    <div className="flex flex-col md:flex-row h-screen bg-gray-100">
+      {/* 左侧品牌区 */}
+      <div className="hidden md:flex md:w-1/2 flex-col items-center justify-between p-12 relative overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://readdy.ai/api/search-image?query=A%20modern%20university%20campus%20scene%20with%20beautiful%20buildings%2C%20green%20spaces%2C%20and%20students%20walking%20around.%20The%20image%20has%20a%20soft%20gradient%20overlay%20that%20transitions%20from%20deep%20blue%20to%20teal%2C%20giving%20it%20a%20modern%20and%20professional%20appearance.%20The%20scene%20is%20peaceful%20and%20inviting%2C%20perfect%20for%20a%20campus%20activity%20management%20platform.&width=800&height=1024&seq=1&orientation=portrait"
+            alt="校园背景"
+            className="w-full h-full object-cover object-top"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-blue-600/80 z-10"></div>
         </div>
-      </nav>
 
-      <main className="pt-16 min-h-screen">
-        <div className="max-w-[1000px] mx-auto px-6 py-8">
-          <div className="h-[400px] rounded-2xl overflow-hidden mb-8">
-            <img
-              src="https://readdy.ai/api/search-image?query=A%20modern%20university%20auditorium%20filled%20with%20students%20attending%20an%20academic%20lecture%2C%20with%20professional%20lighting%20and%20state-of-the-art%20presentation%20equipment%2C%20creating%20an%20engaging%20learning%20atmosphere&width=1000&height=400&seq=1&orientation=landscape"
-              className="w-full h-full object-cover"
-              alt="活动海报"
-            />
+        <div className="z-20 w-full">
+          <div className="flex items-center">
+            <i className="fas fa-graduation-cap text-4xl text-white mr-3"></i>
+            <h1 className="text-3xl font-bold text-white">CampusEvent</h1>
+          </div>
+        </div>
+
+        <div className="z-20 text-center">
+          <h2 className="text-5xl font-bold text-white mb-6">校园活动管理平台</h2>
+          <p className="text-xl text-white/90">加入我们，开启精彩校园生活</p>
+        </div>
+
+        <div className="z-20 w-full">
+          <p className="text-white/80 text-sm">© 2025 校园活动管理平台 - 让每一个校园活动都精彩纷呈</p>
+        </div>
+      </div>
+
+      {/* 移动端顶部 */}
+      <div className="md:hidden bg-blue-700 p-4 flex items-center justify-center">
+        <i className="fas fa-graduation-cap text-2xl text-white mr-2"></i>
+        <h1 className="text-xl font-bold text-white">校园活动管理平台</h1>
+      </div>
+
+      {/* 右侧注册区 */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-12 bg-white">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-800">用户注册</h2>
+            <p className="text-gray-600 mt-2">请选择您的用户类型进行注册</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">2025 春季学术讲座系列</h1>
-
-            <div className="flex items-center space-x-8 mb-6">
-              <div className="flex items-center text-gray-600">
-                <i className="fas fa-calendar-alt w-5"></i>
-                <span>2025-06-15 14:00-16:00</span>
-              </div>
-              <div className="flex items-center text-gray-600">
-                <i className="fas fa-map-marker-alt w-5"></i>
-                <span>图书馆报告厅</span>
-              </div>
-              <span className="px-3 py-1 bg-purple-100 text-purple-600 rounded-full text-sm">报名进行中</span>
-            </div>
-
-            <div className="border-t border-gray-100 pt-6 mb-8">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <i className="fas fa-university text-purple-600 text-xl"></i>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">计算机科学学院</h3>
-                  <p className="text-sm text-gray-500">主办方</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="prose max-w-none">
-              <h2 className="text-xl font-semibold mb-4">活动详情</h2>
-              <p className="text-gray-600 mb-6">
-                本次讲座邀请到了国际知名专家，将就人工智能领域的最新发展进行深入探讨。讲座内容涵盖机器学习、深度学习等前沿话题，适合对人工智能感兴趣的师生参与。
-              </p>
-
-              <h3 className="text-lg font-semibold mb-4">活动流程</h3>
-              <div className="space-y-4 mb-6">
-                <div className="flex items-start space-x-4">
-                  <div className="text-sm text-gray-500 w-24">13:30-14:00</div>
-                  <div className="flex-1">签到入场</div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="text-sm text-gray-500 w-24">14:00-15:30</div>
-                  <div className="flex-1">专家主题演讲</div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="text-sm text-gray-500 w-24">15:30-16:00</div>
-                  <div className="flex-1">互动问答环节</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-            <h2 className="text-xl font-semibold mb-6">报名信息</h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    姓名 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    学号 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={formData.studentId}
-                    onChange={(e) => setFormData({...formData, studentId: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    手机号码 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    邮箱
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-6 rounded-lg">
-                <h3 className="text-sm font-medium text-gray-700 mb-4">活动须知</h3>
-                <ul className="text-sm text-gray-600 space-y-2">
-                  <li>1. 请准时参加活动，迟到可能无法入场</li>
-                  <li>2. 活动全程禁止录音录像</li>
-                  <li>3. 请保持会场安静，将手机调至静音模式</li>
-                  <li>4. 如需取消报名，请提前24小时告知</li>
-                </ul>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="terms" className="rounded text-purple-600" required />
-                <label htmlFor="terms" className="text-sm text-gray-600">
-                  我已阅读并同意<a href="#" className="text-purple-600">活动须知</a>和<a href="#" className="text-purple-600">隐私政策</a>
-                </label>
-              </div>
-            </form>
-          </div>
-
-          <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg">
-            <div className="max-w-[1000px] mx-auto px-6 py-4">
+          {/* 用户类型选择 */}
+          <div className="flex mb-8 border-b border-gray-200">
+            {(['student', 'club'] as const).map((tab) => (
               <button
-                type="submit"
-                onClick={handleSubmit}
-                className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap !rounded-button"
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-3 font-medium text-center transition-all duration-200 cursor-pointer whitespace-nowrap !rounded-button ${
+                  activeTab === tab
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
-                提交报名
+                {getTabLabel(tab)}
               </button>
-            </div>
+            ))}
           </div>
+
+          {/* 注册表单 */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {formError && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                <i className="fas fa-exclamation-circle mr-2"></i>
+                {formError}
+              </div>
+            )}
+
+            {formSuccess && (
+              <div className="bg-green-50 text-green-600 p-3 rounded-lg text-sm">
+                <i className="fas fa-check-circle mr-2"></i>
+                {formSuccess}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  用户名 *
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                    <i className="fas fa-user"></i>
+                  </span>
+                  <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    placeholder="请输入用户名（至少3位）"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  {activeTab === 'student' ? '姓名' : '社团名称'}
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                    <i className="fas fa-id-card"></i>
+                  </span>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder={activeTab === 'student' ? '请输入真实姓名' : '请输入社团名称'}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  密码 *
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                    <i className="fas fa-lock"></i>
+                  </span>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="请输入密码（至少6位）"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  >
+                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  确认密码 *
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                    <i className="fas fa-lock"></i>
+                  </span>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    placeholder="请再次输入密码"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                    aria-label={showConfirmPassword ? "隐藏确认密码" : "显示确认密码"}
+                  >
+                    <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                  </button>
+                </div>
+              </div>
+
+              {activeTab === 'club' && (
+                <div>
+                  <label htmlFor="intro" className="block text-sm font-medium text-gray-700 mb-1">
+                    社团简介
+                  </label>
+                  <textarea
+                    id="intro"
+                    name="intro"
+                    value={formData.intro}
+                    onChange={handleInputChange}
+                    placeholder="请输入社团简介"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <span>
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                  注册中...
+                </span>
+              ) : (
+                '立即注册'
+              )}
+            </button>
+
+            <div className="text-center">
+              <p className="text-gray-600 text-sm">
+                已有账号？
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  className="text-blue-600 hover:text-blue-700 font-medium ml-1"
+                >
+                  立即登录
+                </button>
+              </p>
+            </div>
+          </form>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

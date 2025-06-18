@@ -1,0 +1,112 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import axios from 'axios';
+
+interface User {
+  id: number;
+  username: string;
+  role: string;
+  name: string;
+}
+
+interface UserContextType {
+  user: User | null;
+  token: string | null;
+  login: (token: string, user: any) => void;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+const UserContext = createContext<UserContextType | undefined>(undefined);
+
+export const useUser = () => {
+  const context = useContext(UserContext);
+  if (context === undefined) {
+    throw new Error('useUser must be used within a UserProvider');
+  }
+  return context;
+};
+
+interface UserProviderProps {
+  children: ReactNode;
+}
+
+export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 从localStorage恢复用户状态
+    const storedToken = localStorage.getItem('access_token');
+    const storedUserRole = localStorage.getItem('user_role');
+    const storedUserId = localStorage.getItem('user_id');
+    const storedUsername = localStorage.getItem('username');
+    const storedUserName = localStorage.getItem('user_name');
+
+    if (storedToken && storedUserRole && storedUserId && storedUsername) {
+      setToken(storedToken);
+      setUser({
+        id: parseInt(storedUserId),
+        username: storedUsername,
+        role: storedUserRole,
+        name: storedUserName || ''
+      });
+
+      // 设置axios默认headers
+      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+    }
+  }, []);
+
+  const login = (newToken: string, newUser: any) => {
+    setToken(newToken);
+    
+    // 确保用户对象有正确的格式
+    const userData: User = {
+      id: newUser.id || 0, // 如果没有id字段，使用0作为默认值
+      username: newUser.username || '',
+      role: newUser.role || '',
+      name: newUser.name || newUser.username || ''
+    };
+    
+    setUser(userData);
+    
+    // 保存到localStorage
+    localStorage.setItem('access_token', newToken);
+    localStorage.setItem('user_role', userData.role);
+    localStorage.setItem('user_id', userData.id.toString());
+    localStorage.setItem('username', userData.username);
+    localStorage.setItem('user_name', userData.name);
+
+    // 设置axios默认headers
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    
+    // 清除localStorage
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('username');
+    localStorage.removeItem('user_name');
+
+    // 清除axios默认headers
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
+  const value: UserContextType = {
+    user,
+    token,
+    login,
+    logout,
+    isAuthenticated: !!token
+  };
+
+  return (
+    <UserContext.Provider value={value}>
+      {children}
+    </UserContext.Provider>
+  );
+}; 

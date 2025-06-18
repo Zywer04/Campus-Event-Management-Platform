@@ -1,26 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
 
 const LoginPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'student' | 'club' | 'admin'>('student');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [username, setUsername] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [rememberMe, setRememberMe] = useState<boolean>(false);
-  const [loginAttempts, setLoginAttempts] = useState<number>(0);
-  const [showCaptcha, setShowCaptcha] = useState<boolean>(false);
-  const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | null>(null);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | null>(null);
+
+  const navigate = useNavigate();
+  const { login } = useUser();
 
   // 密码强度检测
   useEffect(() => {
     if (password.length === 0) {
       setPasswordStrength(null);
-      return;
-    }
-
-    if (password.length < 6) {
+    } else if (password.length < 6) {
       setPasswordStrength('weak');
     } else if (password.length < 10) {
       setPasswordStrength('medium');
@@ -29,49 +31,77 @@ const LoginPage: React.FC = () => {
     }
   }, [password]);
 
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // 表单验证
-  if (!username || !password) {
-    setFormError('用户名和密码不能为空');
-    return;
-  }
+    // 表单验证
+    if (!username || !password) {
+      setFormError('用户名和密码不能为空');
+      return;
+    }
 
-  try {
-    const response = await fetch('http://localhost:3000/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ username, password })
-    });
+    setIsLoading(true);
+    setFormError(null);
 
-    const data = await response.json();
+    try {
+      const response = await axios.post('http://localhost:8000/api/login', {
+        username: username,
+        password: password,
+        role: activeTab
+      });
 
-    if (response.ok) {
-      // 登录成功：保存 token 和 role
-      localStorage.setItem('role', data.user.role);
-      localStorage.setItem('username', data.user.username);
+      const data = response.data;
 
-      // 跳转到主页
-      navigate('/home');
-    } else {
-      // 登录失败
+      console.log('登录响应数据:', data);
+
+      // 检查返回的数据格式
+      if (!data.access_token) {
+        setFormError('服务器返回数据格式错误');
+        return;
+      }
+
+      // 使用UserContext的login方法
+      login(data.access_token, data.user);
+
+      // 根据角色跳转到不同页面
+      switch (data.user.role) {
+        case 'student':
+          navigate('/home');
+          break;
+        case 'club':
+          navigate('/club-activities');
+          break;
+        case 'admin':
+          navigate('/audit');
+          break;
+        default:
+          navigate('/home');
+      }
+
+    } catch (error: any) {
+      console.error('登录错误:', error);
+      
+      if (error.response) {
+        // 服务器返回错误响应
+        const errorMessage = error.response.data?.detail || '登录失败，请检查用户名和密码';
+        setFormError(errorMessage);
+      } else if (error.request) {
+        // 网络错误
+        setFormError('网络连接失败，请检查网络设置');
+      } else {
+        // 其他错误
+        setFormError('登录过程中发生未知错误');
+      }
+
       setLoginAttempts(prev => prev + 1);
 
       if (loginAttempts >= 2) {
         setShowCaptcha(true);
-        setFormError('登录失败次数过多，请输入验证码');
-      } else {
-        setFormError(data.message || '用户名或密码错误，请重试');
       }
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    setFormError('网络错误，请稍后再试');
-  }
-};
-
+  };
 
   const getTabLabel = (tab: 'student' | 'club' | 'admin') => {
     switch (tab) {
@@ -199,6 +229,7 @@ const handleLogin = async (e: React.FormEvent) => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 cursor-pointer whitespace-nowrap !rounded-button"
+                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
                   >
                     <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                   </button>
@@ -265,13 +296,32 @@ const handleLogin = async (e: React.FormEvent) => {
 
             <button
               type="submit"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors cursor-pointer whitespace-nowrap !rounded-button"
+              disabled={isLoading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors cursor-pointer whitespace-nowrap !rounded-button disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              登录
+              {isLoading ? (
+                <span>
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                  登录中...
+                </span>
+              ) : (
+                '登录'
+              )}
             </button>
 
-
-
+            {/* 注册按钮 */}
+            <div className="text-center">
+              <p className="text-gray-600 text-sm mb-2">
+                还没有账号？
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/register')}
+                className="w-full flex justify-center py-2 px-4 border border-blue-600 rounded-lg shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors cursor-pointer whitespace-nowrap !rounded-button"
+              >
+                立即注册
+              </button>
+            </div>
           </form>
 
           {/* 底部信息 */}

@@ -1,143 +1,486 @@
-import os
-import mysql.connector
-from datetime import timedelta
-from fastapi import FastAPI, HTTPException
+"""
+Campus Club Activity Management System – FastAPI backend
+Author: ChatGPT
+Date: 2025-06-17
+
+▶ 运行步骤
+    pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic[dotenv] python-multipart passlib[bcrypt] 
+    uvicorn main:app --reload
+
+数据库: 参见 docs / schema.sql (已由题目给出)
+"""
+
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict
+
+from fastapi import FastAPI, HTTPException, Depends, status, Security, Body
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from mysql.connector import Error
-from typing import List
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
-app = FastAPI()
+from pydantic import BaseModel, Field, field_validator
+from pydantic_settings import BaseSettings
+from sqlalchemy import (Column, String, DateTime, Enum, Integer, BigInteger, Text,
+                        ForeignKey, Date, Time, create_engine, func)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker, Session
 
-# 允许跨域请求
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# ============================
+# FastAPI App
+# ============================
+app = FastAPI(
+    title="校园活动管理系统",
+    description="校园活动管理系统的后端API",
+    version="1.0.0"
 )
 
-# 数据库配置
-DB_CONFIG = {
-    'host': os.getenv("DB_HOST", "142.171.42.174"),
-    'user': os.getenv("DB_USER", "user_activities"),
-    'password': os.getenv("DB_PASSWORD", "1234Qwer,"),
-    'database': os.getenv("DB_NAME", "campus_activities"),
-    'port': os.getenv("DB_PORT", 3306)
-}
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],  # 允许的前端域名
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
+)
 
-# 表单数据结构
-class Registration(BaseModel):
-    activity_id: int
-    name: str
-    studentId: str
-    phone: str
-    email: str
-    remarks: str = ""
+# ============================
+# Settings & JWT Config
+# ============================
+class Settings(BaseSettings):
+    DATABASE_URL: str = "mysql+pymysql://root:1234Qwer,@142.171.42.174:3306/campus_events"
+    JWT_SECRET: str = "fuck_the_software_engineering_class"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 day
 
-# 活动响应模型
-class Activity(BaseModel):
-    id: int
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+# ============================
+# Database
+# ============================
+Base = declarative_base()
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ============================
+# Auth helpers
+# ============================
+
+# 使用更兼容的密码加密方案
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+security = HTTPBearer()
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        if username is None or role is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return {"username": username, "role": role}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Return True if the password matches the hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    """Return the bcrypt hash of the given password."""
+    return pwd_context.hash(password)
+
+# ============================
+# ORM Models
+# ============================
+
+class User(Base):
+    __tablename__ = "users"
+    username = Column(String(64), primary_key=True, index=True)
+    password_hash = Column(String(60), nullable=False)
+    role = Column(Enum("student", "club", "admin"), default="student", nullable=False)
+    name = Column(String(128))
+    created_at = Column(DateTime, server_default=func.now())
+
+    # 移除错误的关系配置
+    # activities = relationship("Activity", back_populates="club", foreign_keys="Activity.club_username")
+
+class Club(Base):
+    __tablename__ = "clubs"
+    username = Column(String(64), ForeignKey("users.username", ondelete="CASCADE"), primary_key=True)
+    intro = Column(Text)
+    user = relationship("User")
+    activities = relationship("Activity", back_populates="club")
+
+class Activity(Base):
+    __tablename__ = "activities"
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    title = Column(String(255), nullable=False)
+    apply_time = Column(DateTime, nullable=False)
+    category = Column(Enum("学术讲座", "文体活动", "志愿服务", "职业发展", "兴趣培养"), nullable=False)
+    date_start = Column(Date, nullable=False)
+    date_end = Column(Date, nullable=False)
+    time_start = Column(Time, nullable=False)
+    time_end = Column(Time, nullable=False)
+    location = Column(String(255), nullable=False)
+    registered = Column(Integer, default=0)
+    capacity = Column(Integer, nullable=False)
+    rating_total = Column(Integer, default=0)
+    rating_count = Column(Integer, default=0)
+    image_url = Column(String(255))
+    description = Column(Text)
+    organizer = Column(String(64), ForeignKey("users.username"))
+    organizer_contact = Column(String(64))
+    club_username = Column(String(64), ForeignKey("clubs.username"))
+    requirements = Column(Text)
+    registration_deadline = Column(DateTime, nullable=False)
+    activity_summary = Column(Text)
+    activity_goals = Column(Text)
+    activity_process = Column(Text)
+    notes = Column(Text)
+    status = Column(Enum("报名中", "审核中", "已结束", "未开始", "已驳回"), default="审核中", nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    club = relationship("Club", back_populates="activities")
+    registrations = relationship("ActivityRegistration", back_populates="activity")
+
+class ActivityRegistration(Base):
+    __tablename__ = "activity_registrations"
+    activity_id = Column(BigInteger, ForeignKey("activities.id", ondelete="CASCADE"), primary_key=True)
+    username = Column(String(64), ForeignKey("users.username", ondelete="CASCADE"), primary_key=True)
+    registered_at = Column(DateTime, server_default=func.now())
+
+    activity = relationship("Activity", back_populates="registrations")
+    user = relationship("User")
+
+# ============================
+# Pydantic Schemas
+# ============================
+
+class TokenData(BaseModel):
+    username: str
+    role: str
+
+class ActivityBase(BaseModel):
     title: str
     category: str
-    tags: List[str]  # 保持为列表类型
-    date: str
-    time: str
+    date_start: datetime
+    date_end: datetime
+    time_start: str
+    time_end: str
     location: str
-    registered: int
     capacity: int
-    likes: int
-    image: str
+    image_url: Optional[str] = None
+    description: Optional[str] = None
+    organizer_contact: Optional[str] = None
+    requirements: Optional[str] = None
+    registration_deadline: datetime
+    activity_summary: Optional[str] = None
+    activity_goals: Optional[str] = None
+    activity_process: Optional[str] = None
+    notes: Optional[str] = None
 
-# 数据库连接工具函数
-def get_db_connection():
-    try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        return connection
-    except Error as e:
-        print(f"数据库连接错误: {e}")
-        raise HTTPException(status_code=500, detail="数据库连接失败")
+class ActivityCreate(ActivityBase):
+    pass
 
-@app.get("/activities", response_model=List[Activity])
-def get_activities():
-    connection = None
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        
-        # 查询所有活动
-        cursor.execute("SELECT * FROM activities")
-        activities = cursor.fetchall()
-        
-        # 将tags字段从逗号分隔的字符串转换为列表
-        for activity in activities:
-            # 转换tags
-            if activity['tags']:
-                activity['tags'] = activity['tags'].split(',')
-            else:
-                activity['tags'] = []
-            
-            # 转换date为字符串
-            activity['date'] = activity['date'].isoformat()  # 转换为YYYY-MM-DD格式
-            
-            # 转换time为字符串（如果需要）
-            if 'time' in activity and isinstance(activity['time'], timedelta):
-                # 处理timedelta类型的时间
-                total_seconds = activity['time'].total_seconds()
-                hours = int(total_seconds // 3600)
-                minutes = int((total_seconds % 3600) // 60)
-                activity['time'] = f"{hours:02d}:{minutes:02d}"
-        
-        return activities
+class ActivityUpdate(BaseModel):
+    title: Optional[str]
+    category: Optional[str]
+    date_start: Optional[datetime]
+    date_end: Optional[datetime]
+    time_start: Optional[str]
+    time_end: Optional[str]
+    location: Optional[str]
+    capacity: Optional[int]
+    image_url: Optional[str]
+    description: Optional[str]
+    organizer_contact: Optional[str]
+    requirements: Optional[str]
+    registration_deadline: Optional[datetime]
+    activity_summary: Optional[str]
+    activity_goals: Optional[str]
+    activity_process: Optional[str]
+    notes: Optional[str]
 
-    except Error as e:
-        print(f"数据库查询错误: {e}")
-        raise HTTPException(status_code=500, detail="获取活动数据失败")
-    finally:
-        if connection and connection.is_connected():
-            cursor.close()
-            connection.close()
+class ActivityOut(ActivityBase):
+    id: int
+    registered: int
+    rating_total: int
+    rating_count: int
+    status: str
 
-@app.post("/register")
-def register_user(registration: Registration):
-    connection = None
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        
-        # 检查活动是否存在且未满
-        cursor.execute(
-            "SELECT registered, capacity FROM activities WHERE id = %s",
-            (registration.activity_id,)
-        )
-        result = cursor.fetchone()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="未找到对应活动")
-        
-        registered, capacity = result
-        if registered >= capacity:
-            raise HTTPException(status_code=400, detail="活动已满")
-        
-        # 更新报名人数
-        cursor.execute(
-            "UPDATE activities SET registered = registered + 1 WHERE id = %s",
-            (registration.activity_id,)
-        )
-        
-        # TODO: 这里可以添加报名信息的存储逻辑
-        # 例如：将报名信息存储到另一个表 registrations 中
-        
-        connection.commit()
-        return {"message": "报名成功"}
+    class Config:
+        from_attributes = True
+
+class StatOut(BaseModel):
+    total_activity_num: int
+    total_registered_num: int
+    avg_likes: float
+    category_breakdown: Dict[str, int]
+
+class ActivityStatusUpdate(BaseModel):
+    status: str
+
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    password: str = Field(min_length=6, max_length=128)
+    role: str = Field(default="student")
+    name: Optional[str] = None
+    intro: Optional[str] = None
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v):
+        if v not in ['student', 'club']:
+            raise ValueError('role must be either "student" or "club"')
+        return v
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict  # 添加用户信息字段
+
+# ============================
+# Utility permissions
+# ============================
+
+def ensure_role(token_data: dict, *roles):
+    if token_data["role"] not in roles:
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+
+def ensure_activity_ownership(db: Session, token_data: dict, activity_id: int):
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    # Admin can do everything
+    if token_data["role"] == "admin":
+        return activity
+    # Club can manage activities under its username
+    if token_data["role"] == "club" and activity.club_username == token_data["username"]:
+        return activity
+    raise HTTPException(status_code=403, detail="Not authorized to manage this activity")
+
+# --------------------------------------------------
+# API endpoints
+# --------------------------------------------------
+
+@app.post("/api/register", response_model=TokenOut)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Create a new user account and return its access token."""
+    if db.query(User).filter(User.username == payload.username).first():
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    user = User(
+        username=payload.username,
+        password_hash=get_password_hash(payload.password),
+        role=payload.role,
+        name=payload.name,
+    )
+    db.add(user)
+
+    if payload.role == "club":
+        db.add(Club(username=payload.username, intro=payload.intro))
+
+    db.commit()
+
+    token = create_access_token({"sub": user.username, "role": user.role})
     
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"数据库更新错误: {e}")
-        raise HTTPException(status_code=500, detail="报名处理失败")
-    finally:
-        if connection and connection.is_connected():
-            cursor.close()
-            connection.close()
+    # 正确序列化用户对象
+    user_dict = {
+        "username": user.username,
+        "role": user.role,
+        "name": user.name,
+        "created_at": user.created_at.isoformat() if user.created_at else None
+    }
+    
+    return TokenOut(access_token=token, user=user_dict)
+
+@app.post("/api/login", response_model=TokenOut)
+def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate user and return an access token."""
+    user = db.query(User).filter(User.username == credentials.username).first()
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = create_access_token({"sub": user.username, "role": user.role})
+    
+    # 正确序列化用户对象
+    user_dict = {
+        "username": user.username,
+        "role": user.role,
+        "name": user.name,
+        "created_at": user.created_at.isoformat() if user.created_at else None
+    }
+    
+    return TokenOut(access_token=token, user=user_dict)
+
+@app.get("/api/get-all-activities", response_model=List[ActivityOut])
+def get_all_activities(db: Session = Depends(get_db)):
+    activities = db.query(Activity).all()
+    return activities
+
+@app.post("/api/create-activity", response_model=int)
+def create_activity(activity: ActivityCreate, token=Depends(verify_token), db: Session = Depends(get_db)):
+    ensure_role(token, "club", "admin")
+    status_value = "审核中" if token["role"] == "club" else "报名中"  # admin直接通过
+    new_act = Activity(
+        title=activity.title,
+        apply_time=datetime.utcnow(),
+        category=activity.category,
+        date_start=activity.date_start,
+        date_end=activity.date_end,
+        time_start=activity.time_start,
+        time_end=activity.time_end,
+        location=activity.location,
+        capacity=activity.capacity,
+        image_url=activity.image_url,
+        description=activity.description,
+        organizer=token["username"],
+        organizer_contact=activity.organizer_contact,
+        club_username=token["username"] if token["role"] == "club" else None,
+        requirements=activity.requirements,
+        registration_deadline=activity.registration_deadline,
+        activity_summary=activity.activity_summary,
+        activity_goals=activity.activity_goals,
+        activity_process=activity.activity_process,
+        notes=activity.notes,
+        status=status_value,
+    )
+    db.add(new_act)
+    db.commit()
+    db.refresh(new_act)
+    return new_act.id
+
+@app.put("/api/modify-activity/{activity_id}")
+def modify_activity(activity_id: int, activity_update: ActivityUpdate, token=Depends(verify_token), db: Session = Depends(get_db)):
+    activity = ensure_activity_ownership(db, token, activity_id)
+    for field, value in activity_update.dict(exclude_unset=True).items():
+        setattr(activity, field, value)
+    activity.updated_at = datetime.utcnow()
+    db.commit()
+    return {"status": "succeeded"}
+
+@app.delete("/api/delete-activity/{activity_id}")
+def delete_activity(activity_id: int, token=Depends(verify_token), db: Session = Depends(get_db)):
+    activity = ensure_activity_ownership(db, token, activity_id)
+    db.delete(activity)
+    db.commit()
+    return {"status": "succeeded"}
+
+@app.get("/api/query-registered-activities", response_model=List[ActivityOut])
+def query_registered_activities(token=Depends(verify_token), db: Session = Depends(get_db)):
+    ensure_role(token, "student", "club", "admin")
+    q = (
+        db.query(Activity)
+        .join(ActivityRegistration)
+        .filter(ActivityRegistration.username == token["username"])
+    )
+    return q.all()
+
+@app.post("/api/update-likes/{activity_id}")
+def update_likes(activity_id: int, token=Depends(verify_token), db: Session = Depends(get_db)):
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    # 简单起见：每次请求 +1 星，实际可接收 stars 参数
+    activity.rating_total += 1
+    activity.rating_count += 1
+    db.commit()
+    return {"status": "succeeded"}
+
+@app.get("/api/get-activity-statistic", response_model=StatOut)
+def get_activity_statistic(token=Depends(verify_token), db: Session = Depends(get_db)):
+    ensure_role(token, "club", "admin")
+    base_query = db.query(Activity)
+    if token["role"] == "club":
+        base_query = base_query.filter(Activity.club_username == token["username"])
+
+    total_activity_num = base_query.count()
+    total_registered_num = db.query(func.sum(Activity.registered)).filter(base_query.subquery().c.id == Activity.id).scalar() or 0
+    rating_aggregate = db.query(func.sum(Activity.rating_total), func.sum(Activity.rating_count)).filter(base_query.subquery().c.id == Activity.id).first()
+    avg_likes = 0.0
+    if rating_aggregate[1]:
+        avg_likes = rating_aggregate[0] / rating_aggregate[1]
+
+    # category breakdown
+    categories = db.query(Activity.category, func.count(Activity.id)).filter(base_query.subquery().c.id == Activity.id).group_by(Activity.category).all()
+    category_breakdown = {c[0]: c[1] for c in categories}
+
+    return StatOut(
+        total_activity_num=total_activity_num,
+        total_registered_num=total_registered_num,
+        avg_likes=round(avg_likes, 2),
+        category_breakdown=category_breakdown,
+    )
+
+@app.patch("/api/update-activity-status/{activity_id}")
+def update_activity_status(
+    activity_id: int,
+    status: str = Body(..., embed=True, example="approved"),
+    token=Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    ensure_role(token, "admin")
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    activity.status = status
+    db.commit()
+    return {"status": "succeeded"}
+
+@app.get("/api/query-managed-activities", response_model=List[ActivityOut])
+def query_managed_activities(token=Depends(verify_token), db: Session = Depends(get_db)):
+    ensure_role(token, "club", "admin")
+    query = db.query(Activity)
+    if token["role"] == "club":
+        query = query.filter(Activity.club_username == token["username"])
+    return query.all()
+
+@app.post("/api/register-activity/{activity_id}")
+def register_activity(activity_id: int, token=Depends(verify_token), db: Session = Depends(get_db)):
+    ensure_role(token, "student")
+    # 检查是否已报名
+    exists = db.query(ActivityRegistration).filter_by(activity_id=activity_id, username=token["username"]).first()
+    if exists:
+        raise HTTPException(status_code=400, detail="Already registered")
+
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    if activity.registered >= activity.capacity:
+        raise HTTPException(status_code=400, detail="Activity full")
+
+    reg = ActivityRegistration(activity_id=activity_id, username=token["username"])
+    db.add(reg)
+    db.commit()
+    return {"status": "succeeded"}
+
+# ----------------------------
+# Initialize tables (dev only)
+# ----------------------------
+if __name__ == "__main__":
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created.")
