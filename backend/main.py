@@ -325,8 +325,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate user and return an access token."""
     user = db.query(User).filter(User.username == credentials.username).first()
-    if not user or not verify_password(credentials.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not user or not verify_password(credentials.password, user.password_hash) or user.role != credentials.role:
+        raise HTTPException(status_code=401, detail=f"Invalid username or password for role {credentials.role}")
     token = create_access_token({"sub": user.username, "role": user.role})
     return TokenOut(access_token=token)
 
