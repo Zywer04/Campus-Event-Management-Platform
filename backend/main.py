@@ -105,7 +105,7 @@ class User(Base):
     name = Column(String(128))
     created_at = Column(DateTime, server_default=func.now())
 
-    activities = relationship("Activity", back_populates="club", foreign_keys="Activity.club_username")
+    # activities = relationship("Activity", back_populates="club", foreign_keys="Activity.club_username")
 
 
 class Club(Base):
@@ -113,6 +113,12 @@ class Club(Base):
     username = Column(String(64), ForeignKey("users.username", ondelete="CASCADE"), primary_key=True)
     intro = Column(Text)
     user = relationship("User")
+
+    # activities = relationship(
+        # "Activity",
+        # back_populates="club",
+        # cascade="all, delete-orphan",
+    # )
 
 
 class Activity(Base):
@@ -145,8 +151,8 @@ class Activity(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    club = relationship("Club", back_populates="activities")
-    registrations = relationship("ActivityRegistration", back_populates="activity")
+    # club = relationship("Club", back_populates="activities")
+    # registrations = relationship("ActivityRegistration", back_populates="activity")
 
 
 class ActivityRegistration(Base):
@@ -155,8 +161,8 @@ class ActivityRegistration(Base):
     username = Column(String(64), ForeignKey("users.username", ondelete="CASCADE"), primary_key=True)
     registered_at = Column(DateTime, server_default=func.now())
 
-    activity = relationship("Activity", back_populates="registrations")
-    user = relationship("User")
+    # activity = relationship("Activity", back_populates="registrations")
+    # user = relationship("User")
 
 # ============================
 # Pydantic Schemas
