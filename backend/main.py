@@ -17,6 +17,7 @@ from fastapi import FastAPI, HTTPException, Depends, status, Security, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 from pydantic import BaseModel, Field, constr
 from pydantic_settings import BaseSettings
 from sqlalchemy import (Column, String, DateTime, Enum, Integer, BigInteger, Text,
@@ -81,6 +82,16 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Security(security))
         return {"username": username, "role": role}
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Return True if the password matches the hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Return the bcrypt hash of the given password."""
+    return pwd_context.hash(password)
 
 # ============================
 # ORM Models
@@ -217,6 +228,20 @@ class StatOut(BaseModel):
     avg_likes: float
     category_breakdown: Dict[str, int]
 
+
+class ActivityStatusUpdate(BaseModel):
+    status: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
 # ============================
 # FastAPI Application
 # ============================
@@ -248,6 +273,16 @@ def ensure_activity_ownership(db: Session, token_data: dict, activity_id: int):
 # --------------------------------------------------
 # API endpoints
 # --------------------------------------------------
+
+
+@app.post("/api/login", response_model=TokenOut)
+def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate user and return an access token."""
+    user = db.query(User).filter(User.username == credentials.username).first()
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = create_access_token({"sub": user.username, "role": user.role})
+    return TokenOut(access_token=token)
 
 @app.get("/api/get-all-activities", response_model=List[ActivityOut])
 def get_all_activities(db: Session = Depends(get_db)):
