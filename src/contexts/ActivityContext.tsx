@@ -4,6 +4,7 @@ import api from '../utils/api';
 import { getActivityStats } from '../utils/api';
 import type { ActivityStats } from '../utils/api';
 import type { Activity } from '../types/activity';
+import { useUser } from './UserContext';
 
 interface ActivityContextType {
   activities: Activity[];
@@ -38,6 +39,7 @@ export const ActivityProvider: React.FC<ActivityProviderProps> = ({ children }) 
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<ActivityStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const { user } = useUser();
 
   const fetchActivities = async () => {
     try {
@@ -74,6 +76,11 @@ export const ActivityProvider: React.FC<ActivityProviderProps> = ({ children }) 
   };
 
   const refreshStats = async () => {
+    // 只有社团和管理员才能获取统计数据
+    if (!user || (user.role !== 'club' && user.role !== 'admin')) {
+      return;
+    }
+
     try {
       setLoadingStats(true);
       const data = await getActivityStats();
@@ -87,8 +94,14 @@ export const ActivityProvider: React.FC<ActivityProviderProps> = ({ children }) 
 
   useEffect(() => {
     fetchActivities();
-    refreshStats();
   }, []);
+
+  // 当用户登录后，如果是社团或管理员，则获取统计数据
+  useEffect(() => {
+    if (user && (user.role === 'club' || user.role === 'admin')) {
+      refreshStats();
+    }
+  }, [user]);
 
   const value: ActivityContextType = {
     activities,

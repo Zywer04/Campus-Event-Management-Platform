@@ -3,29 +3,54 @@
 import React, { useState, useEffect} from 'react';
 import * as echarts from 'echarts';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
+import { getPendingActivities, updateActivityStatus } from '../utils/api';
 
 const AuditPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useUser();
+  
+  // 检查用户权限
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">权限不足</h2>
+          <p className="text-gray-600 mb-4">只有系统管理员可以审核活动</p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // 活动状态筛选选项
   const statusOptions = [
     { id: 'all', label: '全部' },
-    { id: 'pending', label: '待审核' },
-    { id: 'approved', label: '已通过' },
-    { id: 'rejected', label: '已拒绝' }
+    { id: '审核中', label: '待审核' },
+    { id: '报名中', label: '已通过' },
+    { id: '已驳回', label: '已拒绝' }
   ];
 
   // 状态对应的样式
   const statusStyles = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-green-100 text-green-800',
-    rejected: 'bg-red-100 text-red-800'
+    '审核中': 'bg-yellow-100 text-yellow-800',
+    '报名中': 'bg-green-100 text-green-800',
+    '已驳回': 'bg-red-100 text-red-800',
+    '已结束': 'bg-gray-100 text-gray-800',
+    '未开始': 'bg-blue-100 text-blue-800'
   };
 
   // 活动类型
 
 
   // 状态管理
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('审核中'); // 默认显示待审核活动
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -33,90 +58,28 @@ const AuditPage: React.FC = () => {
   const [reviewComment, setReviewComment] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'approve' | 'reject' | null>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // 模拟活动数据
-  const [activities, setActivities] = useState([
-    {
-      id: 1,
-      title: '人工智能与未来发展讲座',
-      club: '计算机科学协会',
-      applyTime: '2025-06-10 14:32',
-      category: 'academic',
-      status: 'pending',
-      location: '图书馆报告厅',
-      startTime: '2025-06-25 14:00',
-      endTime: '2025-06-25 16:00',
-      capacity: 150,
-      description: '本次讲座邀请到了国内知名人工智能专家王教授，将深入探讨人工智能技术的最新发展趋势及其对未来社会的影响。讲座内容涵盖机器学习、深度学习、自然语言处理等前沿技术，以及AI在医疗、教育、交通等领域的应用案例分析。',
-      requirements: '对人工智能领域有兴趣的师生均可参加，无需专业背景。',
-      organizer: '张明',
-      contact: '13800138000'
-    },
-    {
-      id: 2,
-      title: '校园马拉松比赛',
-      club: '体育运动协会',
-      applyTime: '2025-06-09 10:15',
-      category: 'sports',
-      status: 'pending',
-      location: '校园环形跑道',
-      startTime: '2025-06-28 08:00',
-      endTime: '2025-06-28 12:00',
-      capacity: 300,
-      description: '为促进校园体育文化建设，增强学生体质，特举办本次校园马拉松活动。比赛设有5公里、10公里两个组别，参赛者可根据自身情况选择。完赛者将获得纪念奖牌和证书。',
-      requirements: '参赛者需提前进行体检，确保身体状况良好。',
-      organizer: '李强',
-      contact: '13900139000'
-    },
-    {
-      id: 3,
-      title: '环保志愿服务日',
-      club: '绿色环保协会',
-      applyTime: '2025-06-11 09:45',
-      category: 'volunteer',
-      status: 'approved',
-      location: '校园及周边社区',
-      startTime: '2025-06-22 09:00',
-      endTime: '2025-06-22 17:00',
-      capacity: 100,
-      description: '本次活动旨在提高校园环保意识，改善校园及周边社区环境。志愿者将参与垃圾分类宣传、校园清洁、植树等活动。活动结束后，将为志愿者颁发志愿服务证书。',
-      requirements: '所有在校学生均可报名参加，需自备防晒用品。',
-      organizer: '王丽',
-      contact: '13700137000'
-    },
-    {
-      id: 4,
-      title: '职业发展与就业指导讲座',
-      club: '就业服务中心学生会',
-      applyTime: '2025-06-08 16:20',
-      category: 'career',
-      status: 'rejected',
-      location: '大学生活动中心报告厅',
-      startTime: '2025-06-20 14:30',
-      endTime: '2025-06-20 16:30',
-      capacity: 200,
-      description: '邀请知名企业HR和职业规划专家，为毕业生提供求职技巧指导和职业规划建议。内容包括简历制作、面试技巧、职业选择等方面的专业指导。',
-      requirements: '主要面向应届毕业生，其他年级学生也可参加。',
-      organizer: '赵静',
-      contact: '13600136000'
-    },
-    {
-      id: 5,
-      title: '中外文化交流音乐会',
-      club: '国际文化交流协会',
-      applyTime: '2025-06-12 11:30',
-      category: 'cultural',
-      status: 'pending',
-      location: '大学生活动中心音乐厅',
-      startTime: '2025-06-30 19:00',
-      endTime: '2025-06-30 21:00',
-      capacity: 250,
-      description: '本次音乐会将展示中国传统音乐和西方古典音乐，促进中外文化交流。节目包括民乐演奏、西洋管弦乐表演以及中西合璧的创新曲目。',
-      requirements: '免费入场，需提前在线预约座位。',
-      organizer: '陈国际',
-      contact: '13500135000'
+  // 获取待审核活动列表
+  const fetchPendingActivities = async () => {
+    try {
+      setLoading(true);
+      const pendingActivities = await getPendingActivities();
+      setActivities(pendingActivities);
+      console.log('获取到的待审核活动:', pendingActivities); // 添加调试日志
+    } catch (error) {
+      console.error('获取待审核活动失败:', error);
+      alert('获取待审核活动失败，请重试');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  // 组件加载时获取数据
+  useEffect(() => {
+    fetchPendingActivities();
+  }, []);
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -168,24 +131,37 @@ const AuditPage: React.FC = () => {
   };
 
   // 确认审核操作
-  const confirmReviewAction = () => {
+  const confirmReviewAction = async () => {
     if (selectedActivity && confirmAction) {
-      setActivities(activities.map(activity =>
-        activity.id === selectedActivity.id
-          ? {...activity, status: confirmAction === 'approve' ? 'approved' : 'rejected'}
-          : activity
-      ));
-      setShowConfirmModal(false);
-      setShowDetailModal(false);
+      try {
+        const newStatus = confirmAction === 'approve' ? '报名中' : '已驳回';
+        await updateActivityStatus(selectedActivity.id, newStatus);
+        
+        // 更新本地状态
+        setActivities(activities.map(activity =>
+          activity.id === selectedActivity.id
+            ? {...activity, status: newStatus}
+            : activity
+        ));
+        
+        setShowConfirmModal(false);
+        setShowDetailModal(false);
+        alert(`活动${confirmAction === 'approve' ? '审核通过' : '已驳回'}成功！`);
+        
+        // 重新获取活动列表
+        fetchPendingActivities();
+      } catch (error) {
+        console.error('审核操作失败:', error);
+        alert('审核操作失败，请重试');
+      }
     }
   };
 
-  // 过滤活动列表
+  // 过滤活动列表 - 由于getPendingActivities只返回审核中的活动，这里不需要再按状态筛选
   const filteredActivities = activities.filter(activity => {
-    const matchesStatus = selectedStatus === 'all' || activity.status === selectedStatus;
     const matchesSearch = activity.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          activity.club.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+                          (activity.club_username && activity.club_username.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesSearch;
   });
 
   // 处理导航
@@ -439,13 +415,13 @@ const AuditPage: React.FC = () => {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             statusStyles[activity.status as keyof typeof statusStyles] || 'bg-gray-100 text-gray-800'
                           }`}>
-                            {activity.status === 'pending' ? '待审核' :
-                             activity.status === 'approved' ? '已通过' :
-                             activity.status === 'rejected' ? '已拒绝' : '未知'}
+                            {activity.status === '审核中' ? '待审核' :
+                             activity.status === '报名中' ? '已通过' :
+                             activity.status === '已驳回' ? '已拒绝' : '未知'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                          {activity.status === 'pending' && (
+                          {activity.status === '审核中' && (
                             <div className="flex space-x-2">
                               <button
                                 onClick={(e) => {
@@ -469,7 +445,7 @@ const AuditPage: React.FC = () => {
                               </button>
                             </div>
                           )}
-                          {activity.status !== 'pending' && (
+                          {activity.status !== '审核中' && (
                             <button className="px-3 py-1 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap !rounded-button">
                               查看详情
                             </button>
@@ -547,9 +523,9 @@ const AuditPage: React.FC = () => {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     statusStyles[selectedActivity.status as keyof typeof statusStyles] || 'bg-gray-100 text-gray-800'
                   }`}>
-                    {selectedActivity.status === 'pending' ? '待审核' :
-                     selectedActivity.status === 'approved' ? '已通过' :
-                     selectedActivity.status === 'rejected' ? '已拒绝' : '未知'}
+                    {selectedActivity.status === '审核中' ? '待审核' :
+                     selectedActivity.status === '报名中' ? '已通过' :
+                     selectedActivity.status === '已驳回' ? '已拒绝' : '未知'}
                   </span>
                 </div>
                 <div>
@@ -587,7 +563,7 @@ const AuditPage: React.FC = () => {
                 </div>
               </div>
 
-              {selectedActivity.status === 'pending' && (
+              {selectedActivity.status === '审核中' && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">审核意见</h3>
                   <textarea

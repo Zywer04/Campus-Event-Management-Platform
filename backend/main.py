@@ -528,6 +528,14 @@ def register_activity(activity_id: int, token=Depends(verify_token), db: Session
     db.commit()
     return {"status": "succeeded"}
 
+
+@app.get("/api/get-pending-activities", response_model=List[ActivityOut])
+def get_pending_activities(token=Depends(verify_token), db: Session = Depends(get_db)):
+    """获取待审核活动列表，只有管理员可以访问"""
+    ensure_role(token, "admin")
+    activities = db.query(Activity).filter(Activity.status == "审核中").all()
+    return [ActivityOut.from_orm(activity) for activity in activities]
+
 # ----------------------------
 # Initialize tables (dev only)
 # ----------------------------

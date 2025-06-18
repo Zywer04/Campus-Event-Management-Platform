@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { useActivityContext } from '../contexts/ActivityContext';
-import api from '../utils/api';
+import api, { createActivity } from '../utils/api';
+import type { ActivityCreateData } from '../utils/api';
 import type { ActivityCreateForm } from '../types/activityCreate';
 import { ACTIVITY_CATEGORIES, ACTIVITY_VALIDATION_RULES } from '../types/activityCreate';
 
@@ -249,7 +250,7 @@ const App: React.FC = () => {
       setLoading(true);
       
       // 准备提交的数据
-      const submitData = {
+      const submitData: ActivityCreateData = {
         ...formData,
         date_start: new Date(formData.date_start).toISOString(),
         date_end: new Date(formData.date_end).toISOString(),
@@ -257,16 +258,26 @@ const App: React.FC = () => {
         capacity: parseInt(formData.capacity.toString())
       };
 
-      // 调用后端API
-      const response = await api.post('/api/create-activity', submitData);
+      // 调用后端API创建活动
+      const activityId = await createActivity(submitData);
       
-      alert('活动发布成功！');
-      navigate('/'); // 跳转到首页
+      alert(`活动申报成功！活动ID: ${activityId}`);
+      
+      // 清除草稿
+      localStorage.removeItem('activityFormDraft');
+      
+      // 根据用户角色跳转到不同页面
+      if (user?.role === 'club') {
+        navigate('/club-activities'); // 跳转到社团活动管理页面
+      } else {
+        navigate('/'); // 管理员跳转到首页
+      }
+      
       refreshActivities();
       
     } catch (err: any) {
-      console.error('发布活动失败:', err);
-      const message = err.response?.data?.detail || '发布活动失败，请重试';
+      console.error('申报活动失败:', err);
+      const message = err.response?.data?.detail || '申报活动失败，请重试';
       alert(message);
     } finally {
       setLoading(false);

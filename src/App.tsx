@@ -70,9 +70,19 @@ function App() {
                   <Publish />
                 </AuthGuard>
               } />
+              <Route path="/club-apply" element={
+                <AuthGuard allowedRoles={['club']}>
+                  <Publish />
+                </AuthGuard>
+              } />
               <Route path="/ActivityManage" element={
                 <AuthGuard allowedRoles={['club', 'admin']}>
                   <ActivityManage />
+                </AuthGuard>
+              } />
+              <Route path="/club-stats" element={
+                <AuthGuard allowedRoles={['club']}>
+                  <ClubStats />
                 </AuthGuard>
               } />
               <Route path="/ClubStats" element={
