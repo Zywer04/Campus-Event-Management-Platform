@@ -2,10 +2,30 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { createActivity } from '../utils/api'; // 确认路径
 
 const App: React.FC = () => {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    title: string;
+    category: string;
+    startDate: string;
+    startTime: string;
+    endDate: string;
+    endTime: string;
+    location: string;
+    capacity: string;
+    registrationDeadline: string;
+    activitySummary: string;
+    activityGoals: string;
+    activityProcess: string;
+    notes: string;
+    tags: string;
+    requirements: string;
+    organizerContact: string;
+    venueRequirements: string[];
+    equipmentNeeds: { name: string; quantity: string; description: string }[];
+  }>({
     title: '',
     category: '',
     startDate: '',
@@ -19,7 +39,11 @@ const App: React.FC = () => {
     activityGoals: '',
     activityProcess: '',
     notes: '',
-    tags: ''
+    tags: '',
+    requirements: '',
+    organizerContact: '',
+    venueRequirements: [],
+    equipmentNeeds: [{ name: '', quantity: '', description: '' }]
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [poster, setPoster] = useState<File | null>(null);
@@ -35,9 +59,8 @@ const App: React.FC = () => {
     { id: 'academic', name: '学术讲座' },
     { id: 'sports', name: '文体活动' },
     { id: 'volunteer', name: '志愿服务' },
-    { id: 'cultural', name: '文化节日' },
-    { id: 'recruitment', name: '社团招新' },
-    { id: 'other', name: '其他' }
+    { id: 'career', name: '职业发展' },
+    { id: 'interest', name: '兴趣培养' }
   ];
 
   const venueOptions = [
@@ -228,7 +251,7 @@ const App: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (isDraft: boolean = false) => {
+  const handleSubmit = async (isDraft: boolean = false) => {
     if (!isDraft && !validateForm()) {
       // 滚动到第一个错误字段
       const firstErrorField = document.querySelector('[data-error="true"]');
@@ -237,12 +260,46 @@ const App: React.FC = () => {
       }
       return;
     }
-    
-    // 在这里处理表单提交逻辑
-    console.log('Form submitted:', { ...formData, poster, files, isDraft });
-    
-    // 模拟提交成功
-    alert(isDraft ? '已保存为草稿' : '申请已提交审核');
+
+    // category映射：前端英文 -> 后端中文
+    const categoryMapping: { [key: string]: string } = {
+      'academic': '学术讲座',
+      'sports': '文体活动',
+      'volunteer': '志愿服务',
+      'career': '职业发展',
+      'interest': '兴趣培养'
+    };
+
+    // 组装数据，字段名和类型要和后端一致
+    const submitData = {
+      title: formData.title || '',
+      category: categoryMapping[formData.category || ''] || '其他', // 映射category
+      date_start: formData.startDate || '',
+      date_end: formData.endDate || '',
+      time_start: formData.startTime || '',
+      time_end: formData.endTime || '',
+      location: formData.location || '',
+      capacity: parseInt(formData.capacity || '0', 10),
+      description: formData.activitySummary || '',
+      organizer_contact: formData.organizerContact || '',
+      requirements: formData.requirements || '',
+      registration_deadline: formData.registrationDeadline || '',
+      activity_summary: formData.activitySummary || '',
+      activity_goals: formData.activityGoals || '',
+      activity_process: formData.activityProcess || '',
+      notes: formData.notes || ''
+      // image_url: ... // 如有图片URL可加
+    };
+
+    try {
+      const activityId = await createActivity(submitData);
+      alert(isDraft ? '已保存为草稿' : '申请已提交审核，活动ID: ' + activityId);
+      // 跳转到管理页
+      navigate('/ClubActivities');
+    } catch (err) {
+      alert('提交失败，请重试');
+      console.error(err);
+    }
   };
 
   // 自动保存功能
@@ -259,7 +316,11 @@ const App: React.FC = () => {
     const savedDraft = localStorage.getItem('activityFormDraft');
     if (savedDraft) {
       try {
-        setFormData(JSON.parse(savedDraft));
+        const draft = JSON.parse(savedDraft);
+        setFormData(prev => ({
+          ...prev,
+          ...draft
+        }));
       } catch (e) {
         console.error('Failed to load draft:', e);
       }
@@ -484,7 +545,7 @@ const App: React.FC = () => {
                     type="text"
                     id="title"
                     name="title"
-                    value={formData.title}
+                    value={formData.title || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.title ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     placeholder="请输入活动名称"
@@ -504,7 +565,7 @@ const App: React.FC = () => {
                     <select
                       id="category"
                       name="category"
-                      value={formData.category}
+                      value={formData.category || ''}
                       onChange={handleChange}
                       className={`w-full px-4 py-2 text-sm border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none bg-white`}
                       data-error={errors.category ? "true" : "false"}
@@ -532,7 +593,7 @@ const App: React.FC = () => {
                     type="date"
                     id="startDate"
                     name="startDate"
-                    value={formData.startDate}
+                    value={formData.startDate || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.startDate ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     data-error={errors.startDate ? "true" : "false"}
@@ -551,7 +612,7 @@ const App: React.FC = () => {
                     type="time"
                     id="startTime"
                     name="startTime"
-                    value={formData.startTime}
+                    value={formData.startTime || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.startTime ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     data-error={errors.startTime ? "true" : "false"}
@@ -570,7 +631,7 @@ const App: React.FC = () => {
                     type="date"
                     id="endDate"
                     name="endDate"
-                    value={formData.endDate}
+                    value={formData.endDate || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.endDate ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     data-error={errors.endDate ? "true" : "false"}
@@ -589,7 +650,7 @@ const App: React.FC = () => {
                     type="time"
                     id="endTime"
                     name="endTime"
-                    value={formData.endTime}
+                    value={formData.endTime || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.endTime ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     data-error={errors.endTime ? "true" : "false"}
@@ -608,7 +669,7 @@ const App: React.FC = () => {
                     type="text"
                     id="location"
                     name="location"
-                    value={formData.location}
+                    value={formData.location || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.location ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     placeholder="请输入活动地点"
@@ -628,7 +689,7 @@ const App: React.FC = () => {
                     type="number"
                     id="capacity"
                     name="capacity"
-                    value={formData.capacity}
+                    value={formData.capacity || ''}
                     onChange={handleChange}
                     min="1"
                     className={`w-full px-4 py-2 text-sm border ${errors.capacity ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
@@ -649,7 +710,7 @@ const App: React.FC = () => {
                     type="date"
                     id="registrationDeadline"
                     name="registrationDeadline"
-                    value={formData.registrationDeadline}
+                    value={formData.registrationDeadline || ''}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 text-sm border ${errors.registrationDeadline ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                     data-error={errors.registrationDeadline ? "true" : "false"}
@@ -677,7 +738,7 @@ const App: React.FC = () => {
                   <textarea
                     id="activitySummary"
                     name="activitySummary"
-                    value={formData.activitySummary}
+                    value={formData.activitySummary || ''}
                     onChange={handleChange}
                     rows={3}
                     className={`w-full px-4 py-2 text-sm border ${errors.activitySummary ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
@@ -697,7 +758,7 @@ const App: React.FC = () => {
                   <textarea
                     id="activityGoals"
                     name="activityGoals"
-                    value={formData.activityGoals}
+                    value={formData.activityGoals || ''}
                     onChange={handleChange}
                     rows={3}
                     className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -713,7 +774,7 @@ const App: React.FC = () => {
                   <textarea
                     id="activityProcess"
                     name="activityProcess"
-                    value={formData.activityProcess}
+                    value={formData.activityProcess || ''}
                     onChange={handleChange}
                     rows={5}
                     className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -729,12 +790,44 @@ const App: React.FC = () => {
                   <textarea
                     id="notes"
                     name="notes"
-                    value={formData.notes}
+                    value={formData.notes || ''}
                     onChange={handleChange}
                     rows={3}
                     className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="请填写参与者需要注意的事项"
                   ></textarea>
+                </div>
+
+                {/* 参与要求 */}
+                <div>
+                  <label htmlFor="requirements" className="block text-sm font-medium text-gray-700 mb-1">
+                    参与要求
+                  </label>
+                  <textarea
+                    id="requirements"
+                    name="requirements"
+                    value={formData.requirements || ''}
+                    onChange={handleChange}
+                    rows={2}
+                    className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="请填写参与要求（如有）"
+                  ></textarea>
+                </div>
+
+                {/* 组织者联系方式 */}
+                <div>
+                  <label htmlFor="organizerContact" className="block text-sm font-medium text-gray-700 mb-1">
+                    组织者联系方式
+                  </label>
+                  <input
+                    type="text"
+                    id="organizerContact"
+                    name="organizerContact"
+                    value={formData.organizerContact || ''}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="请输入组织者联系方式"
+                  />
                 </div>
               </div>
             </div>
